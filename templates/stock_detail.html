@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票历史数据 - {{ stock_code }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            font-weight: 600;
+        }
+        
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        button {
+            background-color: #0066CC;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:hover {
+            background-color: #004080;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            background-color: white;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th {
+            padding: 18px 15px;
+            text-align: center;
+            border-bottom: 3px solid #4285F4;
+            background-color: #4285F4;
+            color: white;
+            font-weight: 600;
+            font-size: inherit;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            padding: 15px 15px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+            transition: all 0.2s ease;
+        }
+        
+        tr {
+            transition: all 0.3s ease;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #fafbff;
+        }
+        
+        tr:hover {
+            background-color: #f0f4f8;
+        }
+        
+        tr:hover td {
+            background-color: transparent;
+        }
+        
+        td:nth-child(1), td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5) {
+            text-align: center;
+        }
+        
+        /* 调整列宽 */
+        th:nth-child(1), td:nth-child(1) {
+            width: 120px; /* 第一列：日期 */
+        }
+        
+        th:nth-child(2), td:nth-child(2) {
+            width: 80px; /* 第二列：价格 */
+        }
+        
+        th:nth-child(3), td:nth-child(3) {
+            width: 80px; /* 第三列：涨跌幅 */
+        }
+        
+        th:nth-child(4), td:nth-child(4) {
+            width: 120px; /* 第四列：几天几板 */
+        }
+        
+        th:nth-child(5), td:nth-child(5) {
+            width: 400px; /* 第五列：解读 */
+        }
+        
+        th:nth-child(6), td:nth-child(6) {
+            width: 200px; /* 第六列：所属题材 */
+        }
+        
+        /* 3开头股票代码显示为橙色 */
+        .orange-code {
+            color: #FF7F00;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 80px;
+            color: #777;
+            font-size: 18px;
+        }
+        
+        /* 高级视觉效果 */
+        .table-container {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .table-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            z-index: 1;
+        }
+        
+        /* 分时图容器样式 */
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            padding: 20px;
+        }
+        
+        .chart-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .chart-header h2 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+        
+        .min-chart-full {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .full-chart {
+            width: 100%;
+            max-width: 1000px;
+            height: auto;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .full-chart:hover {
+            transform: scale(1.02);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .header-section {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .full-chart {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>股票历史数据 - {{ stock_code }}</h1>
+        </div>
+        
+        <div class="header-section">
+            <button onclick="window.location.href='/'">返回主页</button>
+        </div>
+        
+        <!-- 分时图显示 -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <h2>分时图</h2>
+            </div>
+            <div class="min-chart-full">
+                {% if stock_code.startswith('6') %}
+                    <img src="https://image.sinajs.cn/newchart/min/sh{{ stock_code }}.gif" alt="分时图" class="full-chart" onclick="showFullChart('sh{{ stock_code }}')" title="点击查看大图">
+                {% elif stock_code.startswith('0') or stock_code.startswith('3') %}
+                    <img src="https://image.sinajs.cn/newchart/min/sz{{ stock_code }}.gif" alt="分时图" class="full-chart" onclick="showFullChart('sz{{ stock_code }}')" title="点击查看大图">
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>价格</th>
+                        <th>涨跌幅</th>
+                        <th>几天几板</th>
+                        <th>解读</th>
+                        <th>所属题材</th>
+                    </tr>
+                </thead>
+                <tbody id="stockHistoryTableBody">
+                    {% if history_data %}
+                        {% for stock in history_data %}
+                            <tr>
+                                <td>{{ stock.date }}</td>
+                                <td class="price"></td>
+                                <td class="change-percentage"></td>
+                                <td>{{ stock.m_days_n_boards }}</td>
+                                <td>{{ stock.description }}</td>
+                                <td>{{ stock.plates }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="no-data">暂无该股票的历史数据</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // 获取实时股票数据
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchRealTimeStockData();
+        });
+        
+        // 获取实时股票数据
+        function fetchRealTimeStockData() {
+        const tbody = document.getElementById('stockHistoryTableBody');
+        const rows = tbody.querySelectorAll('tr:not(:has(td[colspan]))');
+        
+        if (rows.length === 0) {
+            return;
+        }
+        
+        // 收集股票代码并格式化
+        const code = '{{ stock_code }}';
+        let market = '';
+        if (code.startsWith('6')) {
+            market = 'SH';
+        } else if (code.startsWith('0') || code.startsWith('3')) {
+            market = 'SZ';
+        }
+        
+        if (!market) {
+            return;
+        }
+        
+        const formattedCode = `${market}${code}`;
+        const stockCodes = [formattedCode]; // 只添加一次股票代码
+            
+            // 构建API URL（使用后端代理）
+            const apiUrl = `/api/realtime-stock-data?symbols=${stockCodes.join(',')}&_=${Date.now()}`;
+            
+            // 发送API请求获取实时数据
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('网络响应错误');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 检查返回数据是否有效
+                    if (data && data.data && data.data.length > 0) {
+                        // 获取股票数据
+                        const stock = data.data[0];
+                        
+                        // 确定颜色（红色上涨，绿色下跌，黑色不变）
+                        const color = stock.percent > 0 ? '#e33232' : (stock.percent < 0 ? '#00a854' : '');
+                        
+                        // 将数据应用到所有行
+                        rows.forEach(row => {
+                            // 更新价格
+                            const priceElement = row.querySelector('.price');
+                            if (priceElement) {
+                                priceElement.textContent = stock.current || '-';
+                                priceElement.style.color = color;
+                            }
+                            
+                            // 更新涨跌幅
+                            const changeElement = row.querySelector('.change-percentage');
+                            if (changeElement) {
+                                changeElement.textContent = (stock.percent || 0).toFixed(2) + '%';
+                                changeElement.style.color = color;
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('获取实时股票数据失败:', error);
+                    console.error('API请求URL:', apiUrl);
+                    console.error('股票代码:', formattedCode);
+                });
+        }
+        // 显示大图分时图
+        function showFullChart(code) {
+            // 创建模态框
+            const modal = document.createElement('div');
+            modal.style.position = 'fixed';
+            modal.style.top = '0';
+            modal.style.left = '0';
+            modal.style.width = '100%';
+            modal.style.height = '100%';
+            modal.style.backgroundColor = 'rgba(0,0,0,0.8)';
+            modal.style.display = 'flex';
+            modal.style.justifyContent = 'center';
+            modal.style.alignItems = 'center';
+            modal.style.zIndex = '1000';
+            
+            // 创建图表容器
+            const chartContainer = document.createElement('div');
+            chartContainer.style.backgroundColor = 'white';
+            chartContainer.style.padding = '20px';
+            chartContainer.style.borderRadius = '10px';
+            chartContainer.style.position = 'relative';
+            
+            // 创建关闭按钮
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '&times;';
+            closeBtn.style.position = 'absolute';
+            closeBtn.style.top = '10px';
+            closeBtn.style.right = '10px';
+            closeBtn.style.fontSize = '24px';
+            closeBtn.style.backgroundColor = 'transparent';
+            closeBtn.style.border = 'none';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.color = '#333';
+            
+            // 创建大图
+            const fullChart = document.createElement('img');
+            fullChart.src = `https://image.sinajs.cn/newchart/min/${code}.gif`;
+            fullChart.style.width = '100%';
+            fullChart.style.maxWidth = '1000px';
+            fullChart.style.height = 'auto';
+            
+            // 添加事件监听
+            closeBtn.onclick = () => {
+                document.body.removeChild(modal);
+            };
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            };
+            
+            // 组装并显示
+            chartContainer.appendChild(closeBtn);
+            chartContainer.appendChild(fullChart);
+            modal.appendChild(chartContainer);
+            document.body.appendChild(modal);
+        }
+    </script>
+</body>
+</html>
