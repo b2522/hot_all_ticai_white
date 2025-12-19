@@ -583,12 +583,15 @@
             // 收集所有股票代码并格式化
             const stockCodes = [];
             const codeMap = new Map(); // 用于存储股票代码和对应的行
+            const stockCodeSet = new Set(); // 用于去重股票代码
             
             rows.forEach(row => {
-                const codeElement = row.querySelector('td:nth-child(4)'); // 代码列现在是第4列
-                if (codeElement) {
+                const codeElement = row.querySelector('td:nth-child(4)'); // 代码列是第4列
+                const dateElement = row.querySelector('td:nth-child(9)'); // 日期列是第9列
+                if (codeElement && dateElement) {
                     const code = codeElement.textContent.trim();
-                    if (code) {
+                    const date = dateElement.textContent.trim();
+                    if (code && date) {
                         // 根据代码判断市场
                         let market = '';
                         if (code.startsWith('6')) {
@@ -599,8 +602,14 @@
                         
                         if (market) {
                             const formattedCode = `${market}${code}`;
-                            stockCodes.push(formattedCode);
-                            codeMap.set(code, row);
+                            // 只添加不重复的股票代码到API请求列表
+                            if (!stockCodeSet.has(formattedCode)) {
+                                stockCodeSet.add(formattedCode);
+                                stockCodes.push(formattedCode);
+                            }
+                            // 使用股票代码和日期的组合作为键，确保唯一性
+                            const uniqueKey = `${code}_${date}`;
+                            codeMap.set(uniqueKey, row);
                         }
                     }
                 }
@@ -627,26 +636,39 @@
                         // 遍历返回的股票数据
                         data.data.forEach(stock => {
                             const code = stock.symbol.substring(2); // 获取6位股票代码
-                            const row = codeMap.get(code);
                             
-                            if (row) {
-                                // 确定颜色（红色上涨，绿色下跌，黑色不变）
-                                const color = stock.percent > 0 ? '#e33232' : (stock.percent < 0 ? '#00a854' : '');
-                                
-                                // 更新价格
-                                const priceElement = row.querySelector('.price');
-                                if (priceElement) {
-                                    priceElement.textContent = stock.current || '-';
-                                    priceElement.style.color = color;
+                            // 查找所有包含该股票代码的行
+                            rows.forEach(row => {
+                                const rowCodeElement = row.querySelector('td:nth-child(4)');
+                                const rowDateElement = row.querySelector('td:nth-child(9)');
+                                if (rowCodeElement && rowDateElement) {
+                                    const rowCode = rowCodeElement.textContent.trim();
+                                    const rowDate = rowDateElement.textContent.trim();
+                                    if (rowCode === code && rowDate) {
+                                        const uniqueKey = `${rowCode}_${rowDate}`;
+                                        const targetRow = codeMap.get(uniqueKey);
+                                        
+                                        if (targetRow) {
+                                            // 确定颜色（红色上涨，绿色下跌，黑色不变）
+                                            const color = stock.percent > 0 ? '#e33232' : (stock.percent < 0 ? '#00a854' : '');
+                                            
+                                            // 更新价格
+                                            const priceElement = targetRow.querySelector('.price');
+                                            if (priceElement) {
+                                                priceElement.textContent = stock.current || '-';
+                                                priceElement.style.color = color;
+                                            }
+                                            
+                                            // 更新涨跌幅
+                                            const changeElement = targetRow.querySelector('.change-percentage');
+                                            if (changeElement) {
+                                                changeElement.textContent = (stock.percent || 0).toFixed(2) + '%';
+                                                changeElement.style.color = color;
+                                            }
+                                        }
+                                    }
                                 }
-                                
-                                // 更新涨跌幅
-                                const changeElement = row.querySelector('.change-percentage');
-                                if (changeElement) {
-                                    changeElement.textContent = (stock.percent || 0).toFixed(2) + '%';
-                                    changeElement.style.color = color;
-                                }
-                            }
+                            });
                         });
                     }
                 })
