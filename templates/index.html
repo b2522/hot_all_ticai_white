@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>热点题材解读</title>
+    <!-- 引入ECharts库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -196,7 +198,7 @@
             background-color: transparent;
         }
         
-        td:nth-child(1), td:nth-child(4), td:nth-child(5), td:nth-child(6), td:nth-child(8), td:nth-child(9) {
+        td:nth-child(1), td:nth-child(2), td:nth-child(5), td:nth-child(6), td:nth-child(7), td:nth-child(9), td:nth-child(10) {
             text-align: center;
         }
         
@@ -206,36 +208,56 @@
         }
         
         th:nth-child(2), td:nth-child(2) {
-            width: 80px; /* 第二列：价格 */
-            text-align: right;
+            width: 120px; /* 第二列：分时图 */
+            text-align: center;
+            padding: 0;
         }
         
         th:nth-child(3), td:nth-child(3) {
-            width: 80px; /* 第三列：涨跌幅 */
+            width: 80px; /* 第三列：价格 */
             text-align: right;
         }
         
+        th:nth-child(4), td:nth-child(4) {
+            width: 80px; /* 第四列：涨跌幅 */
+            text-align: right;
+        }
+        
+        /* 分时图容器样式 */
+        .time-chart {
+            width: 120px;
+            height: 60px;
+            margin: 0 auto;
+            display: block;
+        }
+        
+        /* 确保分时图列的单元格有足够的高度 */
+        td:nth-child(2) {
+            height: 60px;
+            padding: 0;
+        }
+        
         /* 隐藏代码列和市场列 */
-        th:nth-child(4), td:nth-child(4), /* 第四列：代码 */
-        th:nth-child(5), td:nth-child(5)  /* 第五列：市场 */
+        th:nth-child(5), td:nth-child(5), /* 第五列：代码 */
+        th:nth-child(6), td:nth-child(6)  /* 第六列：市场 */
         {
             display: none;
         }
         
-        th:nth-child(6), td:nth-child(6) {
-            width: 100px; /* 第六列：几天几板 */
-        }
-        
         th:nth-child(7), td:nth-child(7) {
-            width: 500px; /* 第七列：解读 - 增加宽度以完整显示内容 */
+            width: 100px; /* 第七列：几天几板 */
         }
         
         th:nth-child(8), td:nth-child(8) {
-            width: 100px; /* 第八列：所属题材 - 适当减少宽度 */
+            width: 500px; /* 第八列：解读 - 增加宽度以完整显示内容 */
         }
         
         th:nth-child(9), td:nth-child(9) {
-            width: 100px; /* 第九列：日期 - 适当减少宽度 */
+            width: 100px; /* 第九列：所属题材 - 适当减少宽度 */
+        }
+        
+        th:nth-child(10), td:nth-child(10) {
+            width: 100px; /* 第十列：日期 - 适当减少宽度 */
         }
         
         /* 排序表头样式 */
@@ -352,6 +374,7 @@
                 <thead>
                     <tr>
                         <th>股票名称</th>
+                        <th>分时图</th>
                         <th>价格</th>
                         <th class="sortable" onclick="sortByChangePercentage()">涨跌幅</th>
                         <th>代码</th>
@@ -371,6 +394,7 @@
                         {% for stock in stocks %}
                             <tr>
                                 <td><a href="https://xuangutong.com.cn/stock/{{ stock.code_part }}.{{ stock.market|upper }}" target="_blank" style="text-decoration: none; color: #2c3e50;">{{ stock.name }}</a></td>
+                                <td><div class="time-chart" data-code="{{ stock.code_part }}"></div></td>
                                 <td class="price"></td>
                                 <td class="change-percentage"></td>
                                 <td class="{% if stock.code_part.startswith('3') %}orange-code{% endif %}">{{ stock.code_part }}</td>
@@ -394,7 +418,7 @@
     <script>
         // 搜索建议功能，从后端API获取数据
         function showSuggestions(inputValue) {
-            const suggestionsContainer = document.getElementById('searchSuggestions');
+            var suggestionsContainer = document.getElementById('searchSuggestions');
             
             if (inputValue === '') {
                 suggestionsContainer.style.display = 'none';
@@ -402,9 +426,9 @@
             }
             
             // 发送AJAX请求到后端API
-            fetch(`/search?keyword=${encodeURIComponent(inputValue)}`)
-                .then(response => response.json())
-                .then(filteredNames => {
+            fetch('/search?keyword=' + encodeURIComponent(inputValue))
+                .then(function(response) { return response.json(); })
+                .then(function(filteredNames) {
                     console.log('后端返回的搜索结果数量:', filteredNames.length);
                     console.log('搜索结果:', filteredNames);
                     
@@ -414,22 +438,22 @@
                     }
                     
                     suggestionsContainer.innerHTML = '';
-                    filteredNames.forEach(name => {
-                        const div = document.createElement('div');
+                    Array.prototype.forEach.call(filteredNames, function(name) {
+                        var div = document.createElement('div');
                         div.className = 'search-suggestion-item';
                         div.textContent = name;
-                        div.onclick = () => {
+                        div.onclick = function() {
                             document.getElementById('searchInput').value = name;
                             suggestionsContainer.style.display = 'none';
                             // 跳转到搜索结果页面
-                            window.location.href = `/search-results?keyword=${encodeURIComponent(name)}`;
+                            window.location.href = '/search-results?keyword=' + encodeURIComponent(name);
                         };
                         suggestionsContainer.appendChild(div);
                     });
                     
                     suggestionsContainer.style.display = 'block';
                 })
-                .catch(error => {
+                .catch(function(error) {
                     console.error('获取搜索建议失败:', error);
                     suggestionsContainer.style.display = 'none';
                 });
@@ -444,13 +468,13 @@
             }
             
             // 统一日期格式：将YYYY-MM-DD转换为YYYYMMDD
-            const normalizedDate = dateValue.replace(/-/g, '');
+            var normalizedDate = dateValue.replace(/-/g, '');
             
             // 发送AJAX请求获取指定日期的数据
-            fetch(`/get-data-by-date?date=${encodeURIComponent(normalizedDate)}`)
-                .then(response => response.json())
-                .then(data => {
-                    const tbody = document.getElementById('stockTableBody');
+            fetch('/get-data-by-date?date=' + encodeURIComponent(normalizedDate))
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    var tbody = document.getElementById('stockTableBody');
                     tbody.innerHTML = '';
                     
                     if (data.length === 0) {
@@ -459,26 +483,33 @@
                     }
                     
                     // 渲染数据
-                    data.forEach(stock => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td><a href="https://xuangutong.com.cn/stock/${stock.code_part}.${stock.market.toUpperCase()}" target="_blank" style="text-decoration: none; color: #2c3e50;">${stock.name}</a></td>
-                            <td class="price"></td>
-                            <td class="change-percentage"></td>
-                            <td class="${stock.code_part.startsWith('3') ? 'orange-code' : ''}">${stock.code_part}</td>
-                            <td>${stock.market}</td>
-                            <td>${stock.m_days_n_boards}</td>
-                            <td>${stock.description}</td>
-                            <td>${stock.plates}</td>
-                            <td>${stock.date}</td>
-                        `;
-                        tbody.appendChild(row);
-                    });
+                    Array.prototype.forEach.call(data, function(stock) {
+                            var row = document.createElement('tr');
+                            var link = 'https://xuangutong.com.cn/stock/' + stock.code_part + '.' + stock.market.toUpperCase();
+                            var codeClass = stock.code_part.startsWith('3') ? 'orange-code' : '';
+                            row.innerHTML = 
+                                '<td><a href="' + link + '" target="_blank" style="text-decoration: none; color: #2c3e50;">' + stock.name + '</a></td>' +
+                                '<td><div class="time-chart" data-code="' + stock.code_part + '"></div></td>' +
+                                '<td class="price"></td>' +
+                                '<td class="change-percentage"></td>' +
+                                '<td class="' + codeClass + '">' + stock.code_part + '</td>' +
+                                '<td>' + stock.market + '</td>' +
+                                '<td>' + stock.m_days_n_boards + '</td>' +
+                                '<td>' + stock.description + '</td>' +
+                                '<td>' + stock.plates + '</td>' +
+                                '<td>' + stock.date + '</td>';
+                            tbody.appendChild(row);
+                        });
                     
-                    // 渲染完历史数据后，获取实时股票数据
-                    fetchRealTimeStockData();
+                    // 渲染完历史数据后，重置分时图状态并重新渲染
+                    visibleStockCodes = {}; // 重置可见股票代码集合
+            timeChartInstances = {}; // 重置图表实例
+                    setTimeout(function() {
+                        renderVisibleCharts(); // 重新渲染可见区域内的分时图
+                        fetchRealTimeStockData(); // 获取实时股票数据
+                    }, 100);
                 })
-                .catch(error => {
+                .catch(function(error) {
                     console.error('获取指定日期数据失败:', error);
                 });
         }
@@ -495,9 +526,9 @@
         // 搜索输入框回车事件
         document.getElementById('searchInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                const searchTerm = this.value.trim();
+                var searchTerm = this.value.trim();
                 if (searchTerm) {
-                    window.location.href = `/search-results?keyword=${encodeURIComponent(searchTerm)}`;
+                    window.location.href = '/search-results?keyword=' + encodeURIComponent(searchTerm);
                 }
             }
         });
@@ -507,15 +538,15 @@
             document.getElementById('searchInput').value = '';
             document.getElementById('searchSuggestions').style.display = 'none';
             // 显示所有行
-            const rows = document.querySelectorAll('#stockTableBody tr');
-            rows.forEach(row => {
+            var rows = document.querySelectorAll('#stockTableBody tr');
+            rows.forEach(function(row) {
                 row.style.display = '';
             });
         }
         
         // 点击页面其他地方关闭搜索提示
-        document.addEventListener('click', (e) => {
-            const searchContainer = document.querySelector('.search-container');
+        document.addEventListener('click', function(e) {
+            var searchContainer = document.querySelector('.search-container');
             if (!searchContainer.contains(e.target)) {
                 document.getElementById('searchSuggestions').style.display = 'none';
             }
@@ -538,7 +569,7 @@
                 // 立即执行一次刷新
                 fetchRealTimeStockData();
                 // 设置定时器，每60秒执行一次
-                refreshTimer = setInterval(() => {
+                refreshTimer = setInterval(function() {
                     if (isInTradingHours()) {
                         fetchRealTimeStockData();
                     } else {
@@ -553,29 +584,55 @@
             }
         }
         
-        // 加载可用日期并初始化日历选择器
+        // 节流函数，限制函数调用频率
+        function throttle(func, delay) {
+            var lastCall = 0;
+            return function() {
+                var now = Date.now();
+                if (now - lastCall >= delay) {
+                    lastCall = now;
+                    return func.apply(this, arguments);
+                }
+            };
+        }
+
+        // 防抖函数，确保函数只在停止触发一段时间后才执行
+        function debounce(func, delay) {
+            var timeoutId;
+            return function() {
+                var context = this;
+                var args = arguments;
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(function() {
+                    func.apply(context, args);
+                }, delay);
+            };
+        }
+
+        // 全局初始化 - 合并所有DOMContentLoaded事件处理逻辑
         document.addEventListener('DOMContentLoaded', function() {
-            const dateInput = document.getElementById('dateFilter');
+            // 处理日期选择器和可用日期加载
+            var dateInput = document.getElementById('dateFilter');
             if (dateInput) {
                 // 设置最小和最大日期
-                const minDate = '2025-12-01';
-                const today = new Date().toISOString().split('T')[0];
+                var minDate = '2025-12-01';
+                var today = new Date().toISOString().split('T')[0];
                 dateInput.min = minDate;
                 dateInput.max = today;
 
                 // 加载可用日期
                 fetch('/available-dates')
-                    .then(response => response.json())
-                    .then(dates => {
+                    .then(function(response) { return response.json(); })
+                    .then(function(dates) {
                         // 存储可用日期
                         window.availableDates = dates;
 
                         // 验证选择的日期是否有数据且不是周末
-                        dateInput.addEventListener('input', function(e) {
+                        dateInput.addEventListener('input', debounce(function(e) {
                             if (this.value) {
-                                const selectedDate = this.value.replace(/-/g, '');
-                                const dateObj = new Date(this.value);
-                                const dayOfWeek = dateObj.getDay(); // 0=周日, 1=周一, ..., 6=周六
+                                var selectedDate = this.value.replace(/-/g, '');
+                                var dateObj = new Date(this.value);
+                                var dayOfWeek = dateObj.getDay(); // 0=周日, 1=周一, ..., 6=周六
                                 
                                 // 检查是否是周末
                                 if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -590,35 +647,540 @@
                                     this.value = '';
                                 }
                             }
-                        });
+                        }, 300));
                     })
-                    .catch(error => {
+                    .catch(function(error) {
                         console.error('获取可用日期失败:', error);
                     });
             }
             
+            // 分时图初始化
+            // 初始渲染可视区域内的图表
+            renderVisibleCharts();
+            
+            // 添加节流处理的滚动事件监听
+            window.addEventListener('scroll', throttle(function() {
+                renderVisibleCharts();
+            }, 100));
+            
+            // 添加节流处理的窗口大小变化监听
+            window.addEventListener('resize', throttle(function() {
+                renderVisibleCharts();
+            }, 100));
+            
             // 启动定时刷新控制
             controlRefreshTimer();
             
+            // 启动分时图定时刷新控制
+            controlTimeChartRefreshTimer();
+            
             // 每5分钟检查一次交易时间状态，确保在交易时间开始时自动启动刷新
             setInterval(controlRefreshTimer, 5 * 60 * 1000);
+            setInterval(controlTimeChartRefreshTimer, 5 * 60 * 1000);
+            
+            // 页面加载完成后自动获取和显示实时股票数据
+            fetchRealTimeStockData();
         });
         // 刷新状态控制变量
-        let refreshTimer = null;
-        let isRefreshing = false;
-        let retryCount = 0;
-        const MAX_RETRIES = 3;
-        const REFRESH_INTERVAL = 60000; // 60秒
+        var refreshTimer = null;
+        var isRefreshing = false;
+        var retryCount = 0;
+        var MAX_RETRIES = 3;
+        var REFRESH_INTERVAL = 60000; // 60秒
+        
+        // 分时图相关变量
+        var timeChartInstances = {}; // 存储图表实例，使用对象替代Map
+        var visibleStockCodes = {}; // 存储可见的股票代码，使用对象替代Set
+        
+        // 数据缓存对象
+        var dataCache = {
+            timeSharingData: {},
+            realTimeData: {},
+            cacheDuration: 30000 // 缓存30秒
+        };
+        
+        // 根据股票代码获取分时数据的API调用函数，带缓存
+        function fetchTimeSharingData(stockCode) {
+            // 检查缓存中是否有数据，且未过期
+            var cachedData = dataCache.timeSharingData[stockCode];
+            if (cachedData && Date.now() - cachedData.timestamp < dataCache.cacheDuration) {
+                // 使用缓存数据
+                return Promise.resolve(cachedData.data);
+            }
+            
+            // 使用后端代理来避免CORS问题
+            var proxyUrl = '/api/time-sharing-data?code=' + encodeURIComponent(stockCode);
+            
+            // 返回Promise对象
+            return fetch(proxyUrl)
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP error! status: ' + response.status);
+                    }
+                    // 解析JSON响应
+                    return response.json();
+                })
+                .then(function(data) {
+                    // 缓存数据
+                    dataCache.timeSharingData[stockCode] = {
+                        data: data,
+                        timestamp: Date.now()
+                    };
+                    return data;
+                })
+                .catch(function(error) {
+                    console.error(`获取股票 ${stockCode} 的分时数据失败:`, error);
+                    return null;
+                });
+        }
+        
+        // 根据股票代码生成secid参数
+        function generateSecid(stockCode) {
+            if (!stockCode || !stockCode.length) {
+                return null;
+            }
+            
+            // 根据股票代码前缀确定市场
+            var prefix = stockCode[0];
+            var market;
+            
+            if (prefix === '6') {
+                market = '1'; // 沪市
+            } else if (prefix === '0' || prefix === '3') {
+                market = '0'; // 深市
+            } else {
+                console.error(`不支持的股票代码前缀: ${prefix}`);
+                return null;
+            }
+            
+            // 格式为：market.stockCode
+            return market + '.' + stockCode;
+        }
+        
+        // 解析分时数据的函数
+        function parseTimeSharingData(data) {
+            if (!data || data.rc !== 0 || !data.data) {
+                return null;
+            }
+            
+            var preClose = data.data.preClose;
+            var trends = data.data.trends;
+            
+            if (!preClose || !Array.isArray(trends)) {
+                return null;
+            }
+            
+            // 解析trends数组
+            var parsedData = {
+                preClose: parseFloat(preClose),
+                dataPoints: []
+            };
+            
+            trends.forEach(function(trendItem) {
+                var parts = trendItem.split(',');
+                var time = parts[0];
+                var price = parts[1];
+                if (time && price) {
+                    // 使用更兼容的方式解析日期时间
+                    // 假设time格式为："2024-10-15 09:30:00"
+                    var dateTime = parseDateTime(time);
+                    parsedData.dataPoints.push({
+                        time: dateTime,
+                        price: parseFloat(price)
+                    });
+                }
+            });
+            
+            return parsedData;
+        }
+        
+        // 兼容不同浏览器的日期时间解析函数
+        function parseDateTime(dateTimeString) {
+            // 处理常见的日期时间格式
+            if (!dateTimeString) {
+                return new Date();
+            }
+            
+            // 替换空格为T，使格式符合ISO 8601标准
+            var isoString = dateTimeString.replace(' ', 'T');
+            
+            // 尝试直接解析（现代浏览器）
+            var date = new Date(isoString);
+            
+            // 如果解析失败，尝试手动解析
+            if (isNaN(date.getTime())) {
+                // 假设格式为："YYYY-MM-DD HH:mm:ss"
+                var parts = dateTimeString.split(/[- :]/);
+                if (parts.length === 6) {
+                    // 手动创建Date对象
+                    return new Date(
+                        parseInt(parts[0]),   // 年
+                        parseInt(parts[1])-1, // 月（0-11）
+                        parseInt(parts[2]),   // 日
+                        parseInt(parts[3]),   // 时
+                        parseInt(parts[4]),   // 分
+                        parseInt(parts[5])    // 秒
+                    );
+                }
+            }
+            
+            return date;
+        }
+        
+        // 初始化和绘制分时图的函数
+        function initTimeChart(container, stockCode) {
+            // 检查容器是否存在
+            if (!container) {
+                return;
+            }
+            
+            // 创建图表实例，使用canvas渲染器以获得更好的性能
+            var chart = echarts.init(container, null, {
+                renderer: 'canvas',
+                useDirtyRect: true // 使用脏矩形渲染优化
+            });
+            
+            // 存储图表实例
+            timeChartInstances[stockCode] = chart;
+            
+            // 设置图表配置，简化不必要的功能
+            var option = {
+                grid: {
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    containLabel: true
+                },
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        var data = params[0];
+                        // 兼容不同浏览器的时间格式显示
+                        var date = new Date(data.name);
+                        // 手动格式化时间，避免toLocaleTimeString的浏览器兼容性问题
+                        var hours = date.getHours().toString().padStart(2, '0');
+                        var minutes = date.getMinutes().toString().padStart(2, '0');
+                        var time = hours + ':' + minutes;
+                        var price = data.value[1].toFixed(2);
+                        return time + '<br/>价格: ' + price;
+                    },
+                    axisPointer: {
+                        type: 'line' // 使用更简单的line类型代替cross
+                    }
+                },
+                xAxis: {
+                    type: 'time',
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { show: false },
+                    splitLine: { show: false },
+                    splitNumber: 3 // 减少分割线数量
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    axisLabel: { show: false },
+                    splitLine: { show: false },
+                    splitNumber: 2 // 减少分割线数量
+                },
+                // 禁用数据缩放以提高性能
+                series: [
+                    {
+                        type: 'line',
+                        data: [],
+                        smooth: false, // 禁用平滑曲线以提高性能
+                        symbol: 'none',
+                        lineStyle: {
+                            width: 1
+                        },
+                        areaStyle: {
+                            opacity: 0.1
+                        },
+                        animation: false // 禁用动画以提高性能
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+            
+            // 添加窗口大小变化监听，使用节流处理
+            var resizeHandler = throttle(function() {
+                chart.resize();
+            }, 100);
+            
+            window.addEventListener('resize', resizeHandler);
+            
+            // 存储resize处理函数，以便稍后移除
+            chart.resizeHandler = resizeHandler;
+            
+            return chart;
+        }
+        
+        // 根据数据更新图表
+        function updateTimeChart(chart, parsedData) {
+            if (!chart || !parsedData) {
+                return;
+            }
+            
+            var preClose = parsedData.preClose;
+            var dataPoints = parsedData.dataPoints;
+            
+            // 准备图表数据
+            var chartData = dataPoints.map(function(point) {
+                return [point.time, point.price];
+            });
+            
+            // 设置线条颜色
+            var lineColor = '#333'; // 默认颜色
+            var areaColor = '#333';
+            
+            if (dataPoints.length > 0) {
+                var lastPrice = dataPoints[dataPoints.length - 1].price;
+                if (lastPrice > preClose) {
+                    lineColor = '#e33232'; // 红色
+                    // 使用ECharts兼容的方式定义渐变
+                    areaColor = {
+                        type: 'linear',
+                        x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: 'rgba(227, 50, 50, 0.5)' },
+                            { offset: 1, color: 'rgba(227, 50, 50, 0.1)' }
+                        ]
+                    };
+                } else if (lastPrice < preClose) {
+                    lineColor = '#00a854'; // 绿色
+                    // 使用ECharts兼容的方式定义渐变
+                    areaColor = {
+                        type: 'linear',
+                        x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: 'rgba(0, 168, 84, 0.5)' },
+                            { offset: 1, color: 'rgba(0, 168, 84, 0.1)' }
+                        ]
+                    };
+                }
+            }
+            
+            // 更新图表配置
+            chart.setOption({
+                yAxis: {
+                    min: function(value) {
+                        // 设置Y轴最小值为略低于最低价格
+                        return Math.min(value.min, preClose) - (Math.abs(value.max - value.min) * 0.1);
+                    },
+                    max: function(value) {
+                        // 设置Y轴最大值为略高于最高价格
+                        return Math.max(value.max, preClose) + (Math.abs(value.max - value.min) * 0.1);
+                    }
+                },
+                series: [
+                    {
+                        data: chartData,
+                        lineStyle: {
+                            color: lineColor
+                        },
+                        areaStyle: {
+                            color: areaColor
+                        }
+                    }
+                ]
+            });
+        }
+        
+        // 绘制分时图的主函数
+        function drawTimeChart(container, stockCode) {
+            if (!container || !stockCode) {
+                return;
+            }
+            
+            // 确保容器有正确的尺寸
+            if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+                // 容器尺寸为0，等待下一次渲染
+                return;
+            }
+            
+            // 如果已经存在图表实例，直接更新数据
+            if (timeChartInstances[stockCode]) {
+                fetchTimeSharingData(stockCode)
+                    .then(function(rawData) {
+                        if (!rawData) {
+                            return;
+                        }
+                        
+                        // 解析数据
+                        var parsedData = parseTimeSharingData(rawData);
+                        if (!parsedData) {
+                            return;
+                        }
+                        
+                        // 更新图表
+                        updateTimeChart(timeChartInstances[stockCode], parsedData);
+                    })
+                    .catch(function(error) {
+                        console.error('更新股票 ' + stockCode + ' 分时图失败:', error);
+                    });
+            } else {
+                // 获取分时数据
+                fetchTimeSharingData(stockCode)
+                    .then(function(rawData) {
+                        if (!rawData) {
+                            return;
+                        }
+                        
+                        // 解析数据
+                        var parsedData = parseTimeSharingData(rawData);
+                        if (!parsedData) {
+                            return;
+                        }
+                        
+                        // 初始化图表
+                        var chart = initTimeChart(container, stockCode);
+                        if (!chart) {
+                            return;
+                        }
+                        
+                        // 更新图表
+                        updateTimeChart(chart, parsedData);
+                    })
+                    .catch(function(error) {
+                        console.error('绘制股票 ' + stockCode + ' 分时图失败:', error);
+                    });
+            }
+        }
+        
+        // 检查元素是否在可视区域内（兼容跨浏览器）
+        function isElementInViewport(el) {
+            if (!el) {
+                return false;
+            }
+            
+            var rect = el.getBoundingClientRect();
+            var viewportWidth = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+            var viewportHeight = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+            
+            // 检查元素是否完全或部分在视口中
+            // 对于分时图，只要部分可见就应该渲染
+            return (
+                rect.left < viewportWidth &&
+                rect.right > 0 &&
+                rect.top < viewportHeight &&
+                rect.bottom > 0
+            );
+        }
+        
+        // 渲染可视区域内的分时图
+        function renderVisibleCharts() {
+            var chartContainers = document.querySelectorAll('.time-chart');
+            
+            // 检查是否有任何容器在视口中
+            var anyVisible = false;
+            Array.prototype.forEach.call(chartContainers, function(container) {
+                if (isElementInViewport(container)) {
+                    anyVisible = true;
+                    return false; // 提前退出循环
+                }
+            });
+            
+            // 如果没有任何容器在视口中，直接返回
+            if (!anyVisible) {
+                return;
+            }
+            
+            Array.prototype.forEach.call(chartContainers, function(container) {
+                var stockCode = container.getAttribute('data-code');
+                
+                if (stockCode && isElementInViewport(container) && !visibleStockCodes[stockCode]) {
+                    // 元素在可视区域内且未渲染过
+                    visibleStockCodes[stockCode] = true;
+                    drawTimeChart(container, stockCode);
+                }
+            });
+        }
+        
+
+        
+        // 刷新所有已渲染的分时图
+        function refreshTimeCharts() {
+            if (Object.keys(visibleStockCodes).length === 0) {
+                return;
+            }
+            
+            // 获取所有可见的股票代码
+            var stockCodes = Object.keys(visibleStockCodes);
+            
+            // 使用Promise.all并发处理所有请求
+            var promises = Array.prototype.map.call(stockCodes, function(stockCode) {
+                // 获取最新的分时数据
+                return fetchTimeSharingData(stockCode)
+                    .then(function(rawData) {
+                        if (!rawData) {
+                            return;
+                        }
+                        
+                        // 解析数据
+                        var parsedData = parseTimeSharingData(rawData);
+                        if (!parsedData) {
+                            return;
+                        }
+                        
+                        // 获取对应的图表实例
+                        var chart = timeChartInstances[stockCode];
+                        if (chart) {
+                            // 更新图表
+                            updateTimeChart(chart, parsedData);
+                        }
+                    });
+            });
+            
+            // 处理所有Promise完成后的情况
+            Promise.all(promises)
+                .catch(function(error) {
+                    console.error('刷新分时图失败:', error);
+                });
+        }
+        
+        // 控制分时图定时刷新的函数
+        function controlTimeChartRefreshTimer() {
+            // 清除之前的定时器
+            if (timeChartRefreshTimer) {
+                clearInterval(timeChartRefreshTimer);
+                timeChartRefreshTimer = null;
+            }
+            
+            // 检查是否在交易时间内
+            if (isInTradingHours()) {
+                // 在交易时间内，启动定时刷新
+                console.log('当前处于交易时间，启动分时图定时刷新');
+                // 设置定时器，每60秒执行一次
+                timeChartRefreshTimer = setInterval(function() {
+                    if (isInTradingHours()) {
+                        refreshTimeCharts();
+                    } else {
+                        // 如果不在交易时间内，停止定时器
+                        console.log('当前已超出交易时间，停止分时图定时刷新');
+                        clearInterval(timeChartRefreshTimer);
+                        timeChartRefreshTimer = null;
+                    }
+                }, REFRESH_INTERVAL);
+            } else {
+                console.log('当前不在交易时间内，不启动分时图定时刷新');
+            }
+        }
+        
+        // 分时图刷新状态控制变量
+        var timeChartRefreshTimer = null;
         
         // 显示刷新状态
 
         
         // 检查当前时间是否在交易时间段内（周一到周五 9:25-15:00）
         function isInTradingHours() {
-            const now = new Date();
-            const day = now.getDay(); // 0-6，0=周日，1-5=周一到周五
-            const hours = now.getHours();
-            const minutes = now.getMinutes();
+            var now = new Date();
+            var day = now.getDay(); // 0-6，0=周日，1-5=周一到周五
+            var hours = now.getHours();
+            var minutes = now.getMinutes();
             
             // 判断是否为周一到周五
             if (day < 1 || day > 5) {
@@ -644,8 +1206,11 @@
                 return;
             }
             
-            const tbody = document.getElementById('stockTableBody');
-            const rows = tbody.querySelectorAll('tr:not(:has(td[colspan]))');
+            var tbody = document.getElementById('stockTableBody');
+            // 使用更兼容的方式选择行
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr')).filter(function(row) {
+                return !row.querySelector('td[colspan]');
+            });
             
             if (rows.length === 0) {
                 return;
@@ -655,19 +1220,20 @@
             retryCount = 0;
             
             // 收集所有股票代码并格式化
-            const stockCodes = [];
-            const codeMap = new Map(); // 用于存储股票代码和对应的行
-            const stockCodeSet = new Set(); // 用于去重股票代码
+            var stockCodes = [];
+            var codeMap = {}; // 用于存储股票代码和对应的行，使用普通对象替代Map
+            var stockCodeSet = {}; // 用于去重股票代码，使用普通对象替代Set
+            var codesToFetch = []; // 需要从API获取的股票代码
             
-            rows.forEach(row => {
-                const codeElement = row.querySelector('td:nth-child(4)'); // 代码列是第4列
-                const dateElement = row.querySelector('td:nth-child(9)'); // 日期列是第9列
+            Array.prototype.forEach.call(rows, function(row) {
+                var codeElement = row.querySelector('td:nth-child(5)'); // 代码列现在是第5列
+                var dateElement = row.querySelector('td:nth-child(10)'); // 日期列现在是第10列
                 if (codeElement && dateElement) {
-                    const code = codeElement.textContent.trim();
-                    const date = dateElement.textContent.trim();
+                    var code = codeElement.textContent.trim();
+                    var date = dateElement.textContent.trim();
                     if (code && date) {
                         // 根据代码判断市场
-                        let market = '';
+                        var market = '';
                         if (code.startsWith('6')) {
                             market = 'SH';
                         } else if (code.startsWith('0') || code.startsWith('3')) {
@@ -675,15 +1241,21 @@
                         }
                         
                         if (market) {
-                            const formattedCode = `${market}${code}`;
+                            var formattedCode = market + code;
                             // 只添加不重复的股票代码到API请求列表
-                            if (!stockCodeSet.has(formattedCode)) {
-                                stockCodeSet.add(formattedCode);
+                            if (!stockCodeSet[formattedCode]) {
+                                stockCodeSet[formattedCode] = true;
                                 stockCodes.push(formattedCode);
+                                
+                                // 检查缓存
+                                var cached = dataCache.realTimeData[formattedCode];
+                                if (!cached || Date.now() - cached.timestamp >= dataCache.cacheDuration) {
+                                    codesToFetch.push(formattedCode);
+                                }
                             }
                             // 使用股票代码和日期的组合作为键，确保唯一性
-                            const uniqueKey = `${code}_${date}`;
-                            codeMap.set(uniqueKey, row);
+                            var uniqueKey = code + '_' + date;
+                            codeMap[uniqueKey] = row;
                         }
                     }
                 }
@@ -693,70 +1265,67 @@
                 return;
             }
             
+            // 合并缓存数据和需要从API获取的数据
+            var allData = {};
+            
+            // 先添加所有缓存数据
+            stockCodes.forEach(function(code) {
+                var cached = dataCache.realTimeData[code];
+                if (cached && Date.now() - cached.timestamp < dataCache.cacheDuration) {
+                    allData[code] = cached.data;
+                }
+            });
+            
+            // 如果没有需要从API获取的数据，直接使用缓存数据更新
+            if (codesToFetch.length === 0) {
+                updateStockTable(allData, rows, codeMap);
+                isRefreshing = false;
+                return;
+            }
+            
             // 构建API URL（使用后端代理）
-            const apiUrl = `/api/realtime-stock-data?symbols=${stockCodes.join(',')}&_=${Date.now()}`;
+            var apiUrl = '/api/realtime-stock-data?symbols=' + codesToFetch.join(',') + '&_=' + Date.now();
             
             // 发送API请求获取实时数据
             fetch(apiUrl)
-                .then(response => {
+                .then(function(response) {
                     if (!response.ok) {
                         throw new Error('网络响应错误');
                     }
                     return response.json();
                 })
-                .then(data => {
+                .then(function(data) {
                     // 检查返回数据是否有效
                     if (data && data.data) {
-                        // 遍历返回的股票数据
-                        data.data.forEach(stock => {
-                            const code = stock.symbol.substring(2); // 获取6位股票代码
-                            
-                            // 查找所有包含该股票代码的行
-                            rows.forEach(row => {
-                                const rowCodeElement = row.querySelector('td:nth-child(4)');
-                                const rowDateElement = row.querySelector('td:nth-child(9)');
-                                if (rowCodeElement && rowDateElement) {
-                                    const rowCode = rowCodeElement.textContent.trim();
-                                    const rowDate = rowDateElement.textContent.trim();
-                                    if (rowCode === code && rowDate) {
-                                        const uniqueKey = `${rowCode}_${rowDate}`;
-                                        const targetRow = codeMap.get(uniqueKey);
-                                        
-                                        if (targetRow) {
-                                            // 确定颜色（红色上涨，绿色下跌，黑色不变）
-                                            const color = stock.percent > 0 ? '#e33232' : (stock.percent < 0 ? '#00a854' : '');
-                                            
-                                            // 更新价格
-                                            const priceElement = targetRow.querySelector('.price');
-                                            if (priceElement) {
-                                                priceElement.textContent = stock.current || '-';
-                                                priceElement.style.color = color;
-                                            }
-                                            
-                                            // 更新涨跌幅
-                                            const changeElement = targetRow.querySelector('.change-percentage');
-                                            if (changeElement) {
-                                                changeElement.textContent = (stock.percent || 0).toFixed(2) + '%';
-                                                changeElement.style.color = color;
-                                            }
-                                        }
-                                    }
-                                }
-                            });
+                        // 更新缓存并合并数据
+                        Array.prototype.forEach.call(data.data, function(stock) {
+                            allData[stock.symbol] = stock;
+                            // 更新缓存
+                            dataCache.realTimeData[stock.symbol] = {
+                                data: stock,
+                                timestamp: Date.now()
+                            };
                         });
                         
+                        // 使用合并后的数据更新表格
+                        updateStockTable(allData, rows, codeMap);
                         retryCount = 0;
                     } else {
                         throw new Error('无效的返回数据');
                     }
                 })
-                .catch(error => {
+                .catch(function(error) {
                     console.error('获取实时股票数据失败:', error);
+                    // 如果API请求失败，尝试使用缓存数据
+                    if (Object.keys(allData).length > 0) {
+                        updateStockTable(allData, rows, codeMap);
+                    }
+                    
                     retryCount++;
                     
                     if (retryCount < MAX_RETRIES) {
                         // 重试
-                        setTimeout(() => {
+                        setTimeout(function() {
                             fetchRealTimeStockData();
                         }, 3000); // 3秒后重试
                     } else {
@@ -764,27 +1333,74 @@
                         retryCount = 0;
                     }
                 })
-                .finally(() => {
+                .finally(function() {
                     // 刷新完成
                     isRefreshing = false;
                 });
-
+        }
+        
+        // 更新股票表格数据的辅助函数
+        function updateStockTable(data, rows, codeMap) {
+            if (!data || Object.keys(data).length === 0) {
+                return;
+            }
+            
+            // 遍历所有股票数据
+            Object.keys(data).forEach(function(symbol) {
+                var stock = data[symbol];
+                var code = stock.symbol.substring(2); // 获取6位股票代码
+                
+                // 查找所有包含该股票代码的行
+                Array.prototype.forEach.call(rows, function(row) {
+                    var rowCodeElement = row.querySelector('td:nth-child(5)');
+                    var rowDateElement = row.querySelector('td:nth-child(10)');
+                    if (rowCodeElement && rowDateElement) {
+                        var rowCode = rowCodeElement.textContent.trim();
+                        var rowDate = rowDateElement.textContent.trim();
+                        if (rowCode === code && rowDate) {
+                            var uniqueKey = rowCode + '_' + rowDate;
+                            var targetRow = codeMap[uniqueKey];
+                            
+                            if (targetRow) {
+                                // 确定颜色（红色上涨，绿色下跌，黑色不变）
+                                var color = stock.percent > 0 ? '#e33232' : (stock.percent < 0 ? '#00a854' : '');
+                                
+                                // 更新价格
+                                var priceElement = targetRow.querySelector('.price');
+                                if (priceElement) {
+                                    priceElement.textContent = stock.current || '-';
+                                    priceElement.style.color = color;
+                                }
+                                
+                                // 更新涨跌幅
+                                var changeElement = targetRow.querySelector('.change-percentage');
+                                if (changeElement) {
+                                    changeElement.textContent = (stock.percent || 0).toFixed(2) + '%';
+                                    changeElement.style.color = color;
+                                }
+                            }
+                        }
+                    }
+                });
+            });
         }
         
         // 第六列【几天几板】降序排列功能
-        let isSortedDesc = false;
-        let isChangeSortedDesc = false;
+        var isSortedDesc = false;
+        var isChangeSortedDesc = false;
         
         function sortByDaysBoards() {
-            const tbody = document.getElementById('stockTableBody');
-            const rows = Array.from(tbody.querySelectorAll('tr:not(:has(td[colspan]))'));
-            const header = document.querySelector('th.sortable');
+            var tbody = document.getElementById('stockTableBody');
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr')).filter(function(row) {
+                return !row.querySelector('td[colspan]');
+            });
+            var header = document.querySelector('th.sortable:nth-child(7)');
             
             // 解析几天几板中的数字
             function getBoardCount(text) {
                 if (!text) return 0;
                 // 匹配天数和板数，例如 "3天3板" 会匹配到两个数字 [3, 3]
-                const matches = text.match(/\d+/g);
+                var matches = text.match(/\d+/g);
                 if (matches) {
                     // 优先使用板数（第二个数字），如果没有则使用天数（第一个数字）
                     return parseInt(matches[matches.length - 1]);
@@ -793,9 +1409,9 @@
             }
             
             // 排序
-            rows.sort((a, b) => {
-                const aCount = getBoardCount(a.cells[5].textContent);
-                const bCount = getBoardCount(b.cells[5].textContent);
+            rows.sort(function(a, b) {
+                var aCount = getBoardCount(a.cells[6].textContent);
+                var bCount = getBoardCount(b.cells[6].textContent);
                 
                 if (isSortedDesc) {
                     return aCount - bCount; // 升序
@@ -805,7 +1421,9 @@
             });
             
             // 重新添加行
-            rows.forEach(row => tbody.appendChild(row));
+            Array.prototype.forEach.call(rows, function(row) {
+                tbody.appendChild(row);
+            });
             
             // 更新排序状态
             isSortedDesc = !isSortedDesc;
@@ -815,15 +1433,17 @@
         }
 
         function sortByChangePercentage() {
-            const tbody = document.getElementById('stockTableBody');
-            const rows = Array.from(tbody.querySelectorAll('tr:not(:has(td[colspan]))'));
-            const header = document.querySelector('th.sortable:nth-child(3)');
+            var tbody = document.getElementById('stockTableBody');
+            var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr')).filter(function(row) {
+                return !row.querySelector('td[colspan]');
+            });
+            var header = document.querySelector('th.sortable:nth-child(4)');
             
             // 解析涨跌幅百分比数值
             function getChangePercentage(text) {
                 if (!text) return 0;
                 // 移除%符号并转换为数字
-                const matches = text.match(/[-+]?\d+(?:\.\d+)?/);
+                var matches = text.match(/[-+]?\d+(?:\.\d+)?/);
                 if (matches) {
                     return parseFloat(matches[0]);
                 }
@@ -831,9 +1451,9 @@
             }
             
             // 排序
-            rows.sort((a, b) => {
-                const aChange = getChangePercentage(a.cells[2].textContent);
-                const bChange = getChangePercentage(b.cells[2].textContent);
+            rows.sort(function(a, b) {
+                var aChange = getChangePercentage(a.cells[2].textContent);
+                var bChange = getChangePercentage(b.cells[2].textContent);
                 
                 if (isChangeSortedDesc) {
                     return aChange - bChange; // 升序
@@ -843,7 +1463,9 @@
             });
             
             // 重新添加行
-            rows.forEach(row => tbody.appendChild(row));
+            Array.prototype.forEach.call(rows, function(row) {
+                tbody.appendChild(row);
+            });
             
             // 更新排序状态
             isChangeSortedDesc = !isChangeSortedDesc;
@@ -855,7 +1477,11 @@
         // 题材筛选功能
         function filterByPlate(plateValue) {
             const tbody = document.getElementById('stockTableBody');
-            const rows = Array.from(tbody.querySelectorAll('tr:not(:has(td[colspan]))'));
+            // 使用更兼容的方式选择行
+            const rows = Array.prototype.slice.call(tbody.getElementsByTagName('tr')).filter(function(row) {
+                const cells = row.getElementsByTagName('td');
+                return cells.length > 0 && cells[0].getAttribute('colspan') === null;
+            });
             
             if (!plateValue) {
                 // 如果没有输入筛选条件，显示所有行
@@ -867,11 +1493,17 @@
             
             // 发送AJAX请求到后端API进行筛选
             fetch(`/filter-by-plate?plate=${encodeURIComponent(plateValue)}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(filteredStocks => {
                     // 显示匹配的行，隐藏不匹配的行
                     rows.forEach(row => {
-                        const codeElement = row.querySelector('td:nth-child(4)');
+                        // 正确选择股票代码列（第五列，索引4）
+                        const codeElement = row.getElementsByTagName('td')[4];
                         if (codeElement) {
                             const code = codeElement.textContent.trim();
                             const isMatch = filteredStocks.some(stock => stock.code_part === code);

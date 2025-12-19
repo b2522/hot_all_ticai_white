@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, make_response
 import crawler
 import db
 import os
 import requests
 import logging
+import hashlib
 from pypinyin import lazy_pinyin, FIRST_LETTER
 
 app = Flask(__name__)
@@ -115,7 +116,17 @@ def get_data_by_date():
 def get_available_dates():
     # 获取所有有数据的日期
     dates = db.get_available_dates()
-    return jsonify(dates)
+    
+    # 创建响应并设置缓存头
+    response = make_response(jsonify(dates))
+    response.headers['Cache-Control'] = 'public, max-age=300'  # 缓存5分钟
+    
+    # 生成ETag
+    data_str = str(dates)
+    etag = hashlib.md5(data_str.encode()).hexdigest()
+    response.headers['ETag'] = etag
+    
+    return response
 
 @app.route('/stock/<stock_code>')
 def stock_detail(stock_code):
@@ -144,8 +155,11 @@ def get_realtime_stock_data():
         response = requests.get(api_url, headers=headers)
         response.raise_for_status()  # 抛出HTTP错误
         
-        # 返回获取到的数据
-        return jsonify(response.json())
+        # 返回获取到的数据并设置缓存头
+        result = response.json()
+        api_response = make_response(jsonify(result))
+        api_response.headers['Cache-Control'] = 'public, max-age=60'  # 缓存1分钟
+        return api_response
     except requests.exceptions.RequestException as e:
         return jsonify({'error': f'请求失败: {str(e)}'}), 500
 
@@ -163,6 +177,47 @@ def filter_by_plate():
     except Exception as e:
         logging.error(f"筛选股票数据失败: {e}")
         return jsonify([])
+
+@app.route('/api/time-sharing-data')
+def get_time_sharing_data():
+    # 获取请求参数中的股票代码
+    code = request.args.get('code', '').strip()
+    if not code:
+        return jsonify({'error': '缺少股票代码参数'}), 400
+    
+    try:
+        # 根据股票代码生成secid参数
+        if code[0] == '6':
+            market = '1'  # 沪市
+        elif code[0] == '0' or code[0] == '3':
+            market = '0'  # 深市
+        else:
+            return jsonify({'error': f'不支持的股票代码前缀: {code[0]}'}), 400
+        
+        secid = f"{market}.{code}"
+        
+        # 构建API请求URL
+        api_url = f'https://push2.eastmoney.com/api/qt/stock/trends2/get?fields1=f1,f2,f8,f10&fields2=f51,f53,f56,f58&secid={secid}&ndays=1&iscr=0&iscca=0'
+        
+        # 设置请求头，模拟浏览器请求
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://quote.eastmoney.com/'
+        }
+        
+        # 发送请求获取数据
+        response = requests.get(api_url, headers=headers)
+        response.raise_for_status()  # 抛出HTTP错误
+        
+        # 返回获取到的数据并设置缓存头
+        result = response.json()
+        api_response = make_response(jsonify(result))
+        api_response.headers['Cache-Control'] = 'public, max-age=60'  # 缓存1分钟
+        return api_response
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'请求失败: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'处理失败: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # 确保templates目录存在

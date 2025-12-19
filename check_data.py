@@ -1,31 +1,43 @@
 import sqlite3
+import logging
 
-conn = sqlite3.connect('stock_data.db')
-cursor = conn.cursor()
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# 获取最新的股票表
-cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'stock_%' ORDER BY name DESC LIMIT 1")
-latest_table = cursor.fetchone()
+DB_PATH = "stock_data.db"
 
-if latest_table:
-    print(f"最新表名: {latest_table[0]}")
-    
-    # 查询表中的数据
-    cursor.execute(f"SELECT code, name, plates FROM {latest_table[0]} LIMIT 20")
-    rows = cursor.fetchall()
-    
-    print('最新数据前20条：')
-    for row in rows:
-        print(row)
-    
-    # 查询一些有多个题材的股票
-    cursor.execute(f"SELECT code, name, plates FROM {latest_table[0]} WHERE plates LIKE '%、%' LIMIT 10")
-    multi_plate_stocks = cursor.fetchall()
-    
-    print('\n有多个题材的股票：')
-    for row in multi_plate_stocks:
-        print(row)
-else:
-    print('没有找到股票表')
+def check_stock_data():
+    """检查数据库中的股票数据"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # 获取所有股票表
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'stock_%' ORDER BY name DESC")
+        tables = cursor.fetchall()
+        
+        for table in tables:
+            table_name = table[0]
+            
+            # 检查表中的数据量
+            cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count = cursor.fetchone()[0]
+            
+            logging.info(f"表 {table_name} 中共有 {count} 条数据")
+            
+            # 如果是20251201表，显示前5条数据
+            if table_name == "stock_20251201":
+                cursor.execute(f"SELECT * FROM {table_name} LIMIT 5")
+                rows = cursor.fetchall()
+                logging.info(f"表 {table_name} 的前5条数据:")
+                for row in rows:
+                    logging.info(row)
+                    
+    except Exception as e:
+        logging.error(f"检查数据失败: {e}")
+    finally:
+        conn.close()
 
-conn.close()
+if __name__ == "__main__":
+    # 检查当前数据库中的股票数据
+    check_stock_data()

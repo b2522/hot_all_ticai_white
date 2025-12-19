@@ -9,6 +9,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # API基本URL
 BASE_URL = "https://flash-api.xuangubao.com.cn/api/surge_stock/stocks"
 
+# 请求头，模拟浏览器请求
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive"
+}
+
 # 开始日期：2025年12月1日
 START_DATE = datetime.datetime(2025, 12, 1)
 # 结束日期：今天
@@ -59,8 +68,8 @@ def crawl_stock_data():
                 url = f"{BASE_URL}?date={date_str}&normal=true&uplimit=true"
                 
                 try:
-                    # 发送API请求
-                    response = requests.get(url)
+                    # 发送API请求（使用模拟浏览器的请求头）
+                    response = requests.get(url, headers=HEADERS)
                     response.raise_for_status()  # 检查请求是否成功
                     
                     # 解析JSON数据
@@ -93,19 +102,44 @@ def crawl_stock_data():
 def process_and_store_data(date_str, items):
     """处理股票数据并存储到数据库"""
     processed_data = []
+    total_items = len(items)
+    logging.info(f"开始处理{date_str}的{total_items}条股票数据")
     
-    for item in items:
+    for index, item in enumerate(items):
         try:
-            # 提取需要的数据字段
+            # 验证item是否为列表且长度足够
+            if not isinstance(item, list):
+                logging.error(f"第{index+1}条数据不是列表格式: {item}")
+                continue
+                
+            if len(item) < 12:
+                logging.error(f"第{index+1}条数据字段不足12个: {item}")
+                continue
+            
+            # 提取需要的数据字段并进行验证
             code = item[0]  # 股票代码
+            if not code:
+                logging.error(f"第{index+1}条数据缺少股票代码: {item}")
+                continue
+                
             name = item[1]  # 股票名称
-            description = item[5]  # 解读
+            if not name:
+                logging.error(f"第{index+1}条数据缺少股票名称: {item}")
+                continue
+                
+            # 解读字段，可能为空
+            description = item[5] if len(item) > 5 else ""
             
             # 处理所属题材，可能有多个值，用顿号隔开
-            plates = item[8]  # 所属题材
-            plate_names = "、".join(plate["name"] for plate in plates) if isinstance(plates, list) else ""
+            plates = item[8] if len(item) > 8 else []
+            plate_names = ""
+            if isinstance(plates, list):
+                try:
+                    plate_names = "、".join(plate["name"] for plate in plates if isinstance(plate, dict) and "name" in plate)
+                except Exception as e:
+                    logging.error(f"第{index+1}条数据处理题材时出错: {e}, 题材数据: {plates}")
             
-            # 几天几板
+            # 几天几板，可能为空
             m_days_n_boards = item[11] if len(item) > 11 else ""
             
             # 添加到处理后的数据列表
@@ -119,12 +153,15 @@ def process_and_store_data(date_str, items):
             })
             
         except Exception as e:
-            logging.error(f"处理股票数据时出错: {e}, 数据项: {item}")
+            logging.error(f"处理第{index+1}条股票数据时出错: {e}, 数据项: {item}")
     
     # 存储到数据库
     if processed_data:
+        logging.info(f"处理完成，共处理{len(processed_data)}条有效数据，准备存储到数据库")
         db.store_stock_data(date_str, processed_data)
         logging.info(f"已将{date_str}的{len(processed_data)}条股票数据存储到数据库")
+    else:
+        logging.warning(f"{date_str}没有有效数据可以存储")
 
 if __name__ == "__main__":
     crawl_stock_data()

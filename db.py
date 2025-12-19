@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import logging
+import time
 from pypinyin import lazy_pinyin, Style
 
 # 配置日志
@@ -45,6 +46,14 @@ def create_table(date_str):
             date TEXT NOT NULL
         )
         ''')
+        
+        # 添加索引以加速搜索查询
+        try:
+            cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_name ON {table_name}(name)")
+            cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_plates ON {table_name}(plates)")
+            cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_code ON {table_name}(code)")
+        except Exception as e:
+            logging.warning(f"创建索引失败: {e}")
         
         conn.commit()
         logging.info(f"成功创建表: {table_name}")
@@ -255,10 +264,10 @@ def date_has_data(date_str):
         cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
         
         if cursor.fetchone():
-            # 检查表中是否有数据（超过2条视为有数据）
+            # 检查表中是否有数据（超过0条视为有数据）
             cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
             count = cursor.fetchone()[0]
-            return count > 2
+            return count > 0
         return False
         
     except Exception as e:
@@ -299,6 +308,13 @@ def get_available_dates():
     finally:
         conn.close()
 
+# 题材计数缓存
+plate_counts_cache = {
+    'data': {},
+    'timestamp': 0,
+    'cache_duration': 30000  # 缓存30秒
+}
+
 def sort_stocks_by_plates(stocks):
     """按照题材数量和同一题材股票数量对股票数据进行排序
     1. 题材数量多的股票排在前面
@@ -307,35 +323,46 @@ def sort_stocks_by_plates(stocks):
     if not stocks:
         return []
     
-    # 首先获取所有股票数据来统计题材出现次数
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    # 统计每个题材出现的总次数（基于所有股票）
-    plate_counts = {}
-    
-    try:
-        # 获取所有股票表
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'stock_%'")
-        tables = cursor.fetchall()
+    # 检查缓存是否有效
+    current_time = time.time() * 1000
+    if (current_time - plate_counts_cache['timestamp'] < plate_counts_cache['cache_duration'] and 
+        plate_counts_cache['data']):
+        # 使用缓存的题材计数
+        plate_counts = plate_counts_cache['data']
+    else:
+        # 获取所有股票数据来统计题材出现次数
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
         
-        # 遍历所有表，统计题材出现次数
-        for table in tables:
-            table_name = table[0]
+        # 统计每个题材出现的总次数（基于所有股票）
+        plate_counts = {}
+        
+        try:
+            # 获取最新的几个股票表（只统计最近的10个表，减少计算量）
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'stock_%' ORDER BY name DESC LIMIT 10")
+            tables = cursor.fetchall()
             
-            # 查询表中的所有数据
-            cursor.execute(f"SELECT plates FROM {table_name}")
-            rows = cursor.fetchall()
-            
-            # 统计每个题材的出现次数
-            for row in rows:
-                plates = row[0]
-                if plates:
-                    plate_list = plates.split('、')
-                    for plate in plate_list:
-                        plate_counts[plate] = plate_counts.get(plate, 0) + 1
-    finally:
-        conn.close()
+            # 遍历表，统计题材出现次数
+            for table in tables:
+                table_name = table[0]
+                
+                # 查询表中的所有数据
+                cursor.execute(f"SELECT plates FROM {table_name}")
+                rows = cursor.fetchall()
+                
+                # 统计每个题材的出现次数
+                for row in rows:
+                    plates = row[0]
+                    if plates:
+                        plate_list = plates.split('、')
+                        for plate in plate_list:
+                            plate_counts[plate] = plate_counts.get(plate, 0) + 1
+        finally:
+            conn.close()
+        
+        # 更新缓存
+        plate_counts_cache['data'] = plate_counts
+        plate_counts_cache['timestamp'] = current_time
     
     # 创建一个列表，包含股票和它们的排序键
     stocks_with_keys = []
@@ -505,14 +532,15 @@ def search_stocks_by_plate(plate):
         for table in tables:
             table_name = table[0]
             
-            # 构建搜索SQL，先获取所有数据
+            # 构建搜索SQL，先使用SQL过滤包含关键词的记录
             search_sql = f"""
             SELECT DISTINCT code, name, description, plates, m_days_n_boards, date 
             FROM {table_name}
+            WHERE plates LIKE ?
             """
             
-            # 执行搜索
-            cursor.execute(search_sql)
+            # 执行搜索（SQL层面的模糊匹配）
+            cursor.execute(search_sql, (f"%{plate}%",))
             rows = cursor.fetchall()
             
             # 转换为字典格式并进行拼音首字母筛选
@@ -520,49 +548,22 @@ def search_stocks_by_plate(plate):
                 code = row[0]
                 stock_plates = row[3]
                 
-                # 如果股票没有题材，跳过
-                if not stock_plates:
-                    continue
+                # 分割股票代码和市场
+                code_part = code
+                market = ""
+                if "." in code:
+                    code_part, market = code.split(".")
                 
-                # 检查是否直接包含查询关键词（不区分大小写）
-                if plate.lower() in stock_plates.lower():
-                    match = True
-                    logging.info(f"直接匹配: {stock_plates} 包含 {plate}")
-                else:
-                    # 检查拼音首字母
-                    match = False
-                    plate_list = stock_plates.split('、')
-                    
-                    for current_plate in plate_list:
-                        # 获取题材的拼音首字母
-                        pinyin_initial = ''.join(lazy_pinyin(current_plate, style=Style.FIRST_LETTER))
-                        
-                        # 检查拼音首字母是否精确匹配查询关键词（不区分大小写）
-                        if plate.lower() == pinyin_initial.lower():
-                            match = True
-                            logging.info(f"拼音首字母匹配: {current_plate} 的拼音首字母 {pinyin_initial} 匹配 {plate}")
-                            break
-                    if not match:
-                        logging.info(f"未匹配: {stock_plates} 不包含 {plate}，拼音首字母也不匹配")
-                
-                if match:
-                    code_part = code
-                    market = ""
-                    
-                    # 分割股票代码和市场
-                    if "." in code:
-                        code_part, market = code.split(".")
-                    
-                    search_results.append({
-                        "code": code,
-                        "code_part": code_part,
-                        "market": market,
-                        "name": row[1],
-                        "description": row[2],
-                        "plates": stock_plates,
-                        "m_days_n_boards": row[4],
-                        "date": row[5]
-                    })
+                search_results.append({
+                    "code": code,
+                    "code_part": code_part,
+                    "market": market,
+                    "name": row[1],
+                    "description": row[2],
+                    "plates": stock_plates,
+                    "m_days_n_boards": row[4],
+                    "date": row[5]
+                })
         
         # 应用新的排序规则：按照题材数量和同一题材股票数量排序
         sorted_results = sort_stocks_by_plates(search_results)
