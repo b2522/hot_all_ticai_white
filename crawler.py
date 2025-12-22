@@ -50,11 +50,23 @@ def crawl_stock_data(crawl_today_only=True, force_update=False):
     Args:
         crawl_today_only (bool): 是否只抓取今天的数据（默认True）
         force_update (bool): 是否强制更新已有数据（默认False）
+    
+    Returns:
+        dict: 抓取结果信息，包括状态、日期和数据数量
     """
+    result = {
+        "status": "success",
+        "dates_processed": [],
+        "total_data": 0,
+        "message": ""
+    }
+    
     # 检查是否在允许的抓取时间范围内
     if not is_valid_crawl_time():
         logging.error("不在允许的抓取时间范围内（只能在15:00到9:00之间抓取）")
-        return False
+        result["status"] = "error"
+        result["message"] = "不在允许的抓取时间范围内（只能在15:00到9:00之间抓取）"
+        return result
     
     if crawl_today_only:
         # 只抓取今天的数据
@@ -69,10 +81,12 @@ def crawl_stock_data(crawl_today_only=True, force_update=False):
         # 判断是否为工作日
         if is_weekday(current_date):
             date_str = format_date(current_date)
+            result["dates_processed"].append(date_str)
             
             # 检查该日期是否已有数据
             if db.date_has_data(date_str) and not force_update:
                 logging.info(f"日期{date_str}已有数据，跳过抓取")
+                result["message"] += f"日期{date_str}已有数据，跳过抓取。"
             else:
                 if force_update:
                     logging.info(f"强制更新{date_str}的股票数据")
@@ -98,18 +112,28 @@ def crawl_stock_data(crawl_today_only=True, force_update=False):
                             logging.info(f"成功获取{date_str}的{len(items)}条股票数据")
                             # 处理并存储数据
                             process_and_store_data(date_str, items)
+                            result["total_data"] += len(items)
+                            result["message"] += f"成功获取{date_str}的{len(items)}条股票数据。"
                         else:
                             logging.info(f"{date_str}没有股票数据")
+                            result["message"] += f"{date_str}没有股票数据。"
                     else:
                         logging.error(f"API返回错误: {data.get('message', '未知错误')}")
+                        result["status"] = "error"
+                        result["message"] += f"API返回错误: {data.get('message', '未知错误')}。"
                         
                 except requests.exceptions.RequestException as e:
                     logging.error(f"请求API失败: {e}")
+                    result["status"] = "error"
+                    result["message"] += f"请求API失败: {e}。"
                 except Exception as e:
                     logging.error(f"处理数据时出错: {e}")
+                    result["status"] = "error"
+                    result["message"] += f"处理数据时出错: {e}。"
         else:
             date_str = format_date(current_date)
             logging.info(f"{date_str}是周末，跳过抓取")
+            result["message"] += f"{date_str}是周末，跳过抓取。"
         
         if crawl_today_only:
             # 如果只抓取今天的数据，循环一次就退出
@@ -117,6 +141,8 @@ def crawl_stock_data(crawl_today_only=True, force_update=False):
         else:
             # 日期加1天（无论是否处理了当前日期，都会递增）
             current_date += datetime.timedelta(days=1)
+    
+    return result
 
 def process_and_store_data(date_str, items):
     """处理股票数据并存储到数据库"""
