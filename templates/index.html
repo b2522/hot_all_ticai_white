@@ -31,7 +31,7 @@
                         </th>
                         <th>分时图</th>
                         <th>价格</th>
-                        <th class="sortable" onclick="sortByChangePercentage()">涨跌幅</th>
+                        <th class="sortable" onclick="sortByChangePercentage()">涨幅</th>
                         <th>代码</th>
                         <th>市场</th>
                         <th class="sortable" onclick="sortByDaysBoards()">几天几板</th>
@@ -69,6 +69,26 @@
                     {% endif %}
                 </tbody>
             </table>
+        </div>
+        
+        <!-- 右侧题材统计表 - 移到container内部 -->
+        <div class="sidebar">
+            <div class="plate-stats-container">
+
+                <div class="stats-content">
+                    <table id="plateStatsTable" class="plate-stats-table">
+                        <thead class="plate-stats-table th">
+                            <tr>
+                                <th>题材名称</th>
+                                <th>数量</th>
+                            </tr>
+                        </thead>
+                        <tbody id="plateStatsBody">
+                            <!-- JavaScript将动态填充统计数据 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -165,6 +185,8 @@
                     setTimeout(function() {
                         renderVisibleCharts(); // 重新渲染可见区域内的分时图
                         fetchRealTimeStockData(); // 获取实时股票数据
+                        // 更新题材统计
+                        updatePlateStats();
                     }, 100);
                 })
                 .catch(function(error) {
@@ -1226,13 +1248,23 @@
                 return cells.length > 0 && cells[0].getAttribute('colspan') === null;
             });
             
-            if (!plateValue) {
-                // 如果没有输入筛选条件，显示所有行
+            // 使用display属性来控制行的显示和隐藏，而不是visibility
+            const updateRowVisibility = (showAll) => {
                 rows.forEach(row => {
-                    row.style.display = '';
+                    // 使用display属性控制显示/隐藏
+                    row.style.display = showAll ? '' : 'none';
+                    // 移除visibility属性设置
                 });
+            };
+            
+            if (!plateValue || plateValue.trim() === '') {
+                // 如果没有输入筛选条件，显示所有行
+                updateRowVisibility(true);
                 return;
             }
+            
+            // 先将所有行设置为隐藏，然后显示匹配的行
+            updateRowVisibility(false);
             
             // 发送AJAX请求到后端API进行筛选
             fetch(`/filter-by-plate?plate=${encodeURIComponent(plateValue)}`)
@@ -1250,15 +1282,154 @@
                         if (codeElement) {
                             const code = codeElement.textContent.trim();
                             const isMatch = filteredStocks.some(stock => stock.code_part === code);
+                            // 使用display而不是visibility来控制显示/隐藏
                             row.style.display = isMatch ? '' : 'none';
                         }
                     });
                 })
                 .catch(error => {
                     console.error('筛选题材失败:', error);
+                    // 出错时显示所有行
+                    updateRowVisibility(true);
                 });
         }
+        
+        // 在DOM加载完成后，为搜索框添加防抖处理
+        document.addEventListener('DOMContentLoaded', function() {
+            const plateFilter = document.getElementById('plateFilter');
+            if (plateFilter) {
+                // 移除内联的oninput处理
+                plateFilter.removeAttribute('oninput');
+                // 添加防抖处理的事件监听
+                const debouncedFilter = debounce(filterByPlate, 300);
+                plateFilter.addEventListener('input', function() {
+                    debouncedFilter(this.value);
+                });
+            }
+        });
 
+        // 题材统计功能
+        function updatePlateStats() {
+            // 统计结果对象
+            var plateCounts = {};
+            
+            // 获取所有股票行
+            var rows = document.querySelectorAll('#stockTableBody tr');
+            
+            // 遍历每一行
+            rows.forEach(function(row) {
+                // 获取题材列（索引为8的单元格，即第9列）
+                var plateCell = row.cells[8];
+                if (plateCell) {
+                    // 获取题材内容
+                    var plateContent = plateCell.textContent.trim();
+                    
+                    // 如果存在题材内容
+                    if (plateContent && plateContent !== 'undefined' && plateContent !== null) {
+                        // 使用顿号分割多个题材
+                        var plates = plateContent.split('、');
+                        
+                        // 遍历每个题材
+                        plates.forEach(function(plate) {
+                            // 去除空白字符
+                            plate = plate.trim();
+                            if (plate) {
+                                // 更新统计计数
+                                if (plateCounts[plate]) {
+                                    plateCounts[plate]++;
+                                } else {
+                                    plateCounts[plate] = 1;
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+            
+            // 将统计结果转换为数组并排序（按数量降序）
+            var sortedPlates = Object.entries(plateCounts)
+                .map(function([plate, count]) {
+                    return { plate: plate, count: count };
+                })
+                .sort(function(a, b) {
+                    return b.count - a.count;
+                });
+            
+            // 更新右侧统计表
+            var statsTableBody = document.getElementById('plateStatsBody');
+            if (statsTableBody) {
+                // 清空现有内容
+                statsTableBody.innerHTML = '';
+                
+                // 如果有统计数据
+                if (sortedPlates.length > 0) {
+                    // 遍历排序后的题材数组
+                    sortedPlates.forEach(function(item) {
+                        var row = document.createElement('tr');
+                        
+                        // 创建题材名称单元格
+                        var plateCell = document.createElement('td');
+                        plateCell.textContent = item.plate;
+                        plateCell.className = 'plate-name';
+                        
+                        // 创建数量单元格
+                        var countCell = document.createElement('td');
+                        countCell.textContent = item.count;
+                        countCell.className = 'plate-count';
+                        
+                        // 添加单元格到行
+                        row.appendChild(plateCell);
+                        row.appendChild(countCell);
+                        
+                        // 添加行到表格
+                        statsTableBody.appendChild(row);
+                    });
+                } else {
+                    // 如果没有统计数据，显示提示信息
+                    var row = document.createElement('tr');
+                    var cell = document.createElement('td');
+                    cell.colSpan = 2;
+                    cell.textContent = '暂无题材数据';
+                    cell.className = 'no-data';
+                    row.appendChild(cell);
+                    statsTableBody.appendChild(row);
+                }
+            }
+        }
+        
+        // 监听表格内容变化并更新统计
+        function setupPlateStatsListener() {
+            // 初始加载时更新统计
+            updatePlateStats();
+            
+            // 监听表格内容变化
+            var observer = new MutationObserver(function() {
+                updatePlateStats();
+            });
+            
+            // 观察表格主体的子节点变化
+            var tableBody = document.getElementById('stockTableBody');
+            if (tableBody) {
+                observer.observe(tableBody, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                    characterDataOldValue: false
+                });
+            }
+        }
+        
+        // 在DOM加载完成后设置题材统计监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查filterByDate函数，在其末尾添加更新统计的代码
+            // 如果是通过API加载的数据，需要在数据加载完成后更新统计
+            setupPlateStatsListener();
+            
+            // 立即执行一次统计，确保页面加载时显示题材统计数据
+            setTimeout(function() {
+                updatePlateStats();
+            }, 300); // 稍微延迟一下，确保DOM完全加载
+        });
     </script>
 </body>
 </html>

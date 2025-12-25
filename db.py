@@ -170,8 +170,8 @@ def get_all_stock_data():
     return all_stocks
 
 def get_stock_data_by_date(date_str):
-    """获取指定日期的股票数据"""
-    stocks = []
+    """获取指定日期的股票数据（已去重）"""
+    stock_dict = {}  # 使用字典去重，键为 code+date
     
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -186,9 +186,16 @@ def get_stock_data_by_date(date_str):
             cursor.execute(f"SELECT code, name, description, plates, m_days_n_boards, date FROM {table_name}")
             rows = cursor.fetchall()
             
-            # 转换为字典格式
+            # 转换为字典格式并去重
             for row in rows:
                 code = row[0]
+                date = row[5]
+                unique_key = f"{code}_{date}"
+                
+                # 如果已经存在相同的键，跳过
+                if unique_key in stock_dict:
+                    continue
+                
                 code_part = code
                 market = ""
                 
@@ -196,7 +203,7 @@ def get_stock_data_by_date(date_str):
                 if "." in code:
                     code_part, market = code.split(".")
                 
-                stocks.append({
+                stock_dict[unique_key] = {
                     "code": code,
                     "code_part": code_part,
                     "market": market,
@@ -204,13 +211,16 @@ def get_stock_data_by_date(date_str):
                     "description": row[2],
                     "plates": row[3],
                     "m_days_n_boards": row[4],
-                    "date": row[5]
-                })
+                    "date": date
+                }
+        
+        # 将字典值转换为列表
+        stocks = list(stock_dict.values())
         
         # 应用新的排序规则：按照题材数量和同一题材股票数量排序
         sorted_stocks = sort_stocks_by_plates(stocks)
         
-        logging.info(f"成功获取{date_str}的{len(sorted_stocks)}条股票数据，并完成排序")
+        logging.info(f"成功获取{date_str}的{len(sorted_stocks)}条去重后的股票数据，并完成排序")
         
     except Exception as e:
         logging.error(f"获取{date_str}的数据失败: {e}")
