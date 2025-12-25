@@ -245,8 +245,8 @@ def scheduled_crawl():
 
 # 初始化定时任务调度器
 scheduler = BackgroundScheduler(timezone='Asia/Shanghai')
-# 添加定时任务：周一到周五15:00执行
-scheduler.add_job(scheduled_crawl, 'cron', hour=15, minute=0, second=0, day_of_week='0-4')
+# 添加定时任务：周一到周五15:10执行
+scheduler.add_job(scheduled_crawl, 'cron', hour=15, minute=10, second=0, day_of_week='0-4')
 # 添加定时任务：周一到周五16:15执行
 scheduler.add_job(scheduled_crawl, 'cron', hour=16, minute=15, second=0, day_of_week='0-4')
 
