@@ -1,0 +1,15 @@
+{
+  "crons": [
+    {
+      "path": "/api/crawl",
+      "schedule": "10 15 * * 1-5",
+      "timezone": "Asia/Shanghai"
+    },
+    {
+      "path": "/api/crawl",
+      "schedule": "15 16 * * 1-5",
+      "timezone": "Asia/Shanghai"
+    }
+  ],
+  "version": 2
+}

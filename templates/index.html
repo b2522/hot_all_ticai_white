@@ -87,6 +87,11 @@
                             <!-- JavaScript将动态填充统计数据 -->
                         </tbody>
                     </table>
+                    <!-- 搜索框和按钮 -->
+                    <div class="plate-search-container">
+                        <input type="text" id="plateSearchInput" placeholder="搜索所有题材" class="plate-search-input">
+                        <button onclick="searchPlate()" class="plate-search-button">GO</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -954,11 +959,10 @@
             isRefreshing = true;
             retryCount = 0;
             
-            // 收集所有股票代码并格式化
-            var stockCodes = [];
-            var codeMap = {}; // 用于存储股票代码和对应的行，使用普通对象替代Map
-            var stockCodeSet = {}; // 用于去重股票代码，使用普通对象替代Set
-            var codesToFetch = []; // 需要从API获取的股票代码
+            // 收集所有股票代码并生成secid
+            var secids = [];
+            var codeMap = {}; // 用于存储股票代码和对应的行
+            var secidSet = {}; // 用于去重secid
             
             Array.prototype.forEach.call(rows, function(row) {
                 var codeElement = row.querySelector('td:nth-child(5)'); // 代码列现在是第5列
@@ -967,59 +971,29 @@
                     var code = codeElement.textContent.trim();
                     var date = dateElement.textContent.trim();
                     if (code && date) {
-                        // 根据代码判断市场
-                        var market = '';
-                        if (code.startsWith('6')) {
-                            market = 'SH';
-                        } else if (code.startsWith('0') || code.startsWith('3')) {
-                            market = 'SZ';
+                        // 生成secid：6开头的股票代码使用1.前缀，0或3开头的使用0.前缀
+                        var prefix = code.startsWith('6') ? '1.' : '0.';
+                        var secid = prefix + code;
+                        
+                        // 只添加不重复的secid到API请求列表
+                        if (!secidSet[secid]) {
+                            secidSet[secid] = true;
+                            secids.push(secid);
                         }
                         
-                        if (market) {
-                            var formattedCode = market + code;
-                            // 只添加不重复的股票代码到API请求列表
-                            if (!stockCodeSet[formattedCode]) {
-                                stockCodeSet[formattedCode] = true;
-                                stockCodes.push(formattedCode);
-                                
-                                // 检查缓存
-                                var cached = dataCache.realTimeData[formattedCode];
-                                if (!cached || Date.now() - cached.timestamp >= dataCache.cacheDuration) {
-                                    codesToFetch.push(formattedCode);
-                                }
-                            }
-                            // 使用股票代码和日期的组合作为键，确保唯一性
-                            var uniqueKey = code + '_' + date;
-                            codeMap[uniqueKey] = row;
-                        }
+                        // 使用股票代码和日期的组合作为键，确保唯一性
+                        var uniqueKey = code + '_' + date;
+                        codeMap[uniqueKey] = row;
                     }
                 }
             });
             
-            if (stockCodes.length === 0) {
+            if (secids.length === 0) {
                 return;
             }
             
-            // 合并缓存数据和需要从API获取的数据
-            var allData = {};
-            
-            // 先添加所有缓存数据
-            stockCodes.forEach(function(code) {
-                var cached = dataCache.realTimeData[code];
-                if (cached && Date.now() - cached.timestamp < dataCache.cacheDuration) {
-                    allData[code] = cached.data;
-                }
-            });
-            
-            // 如果没有需要从API获取的数据，直接使用缓存数据更新
-            if (codesToFetch.length === 0) {
-                updateStockTable(allData, rows, codeMap);
-                isRefreshing = false;
-                return;
-            }
-            
-            // 构建API URL（使用后端代理）
-            var apiUrl = '/api/realtime-stock-data?symbols=' + codesToFetch.join(',') + '&_=' + Date.now();
+            // 构建API URL
+            var apiUrl = 'https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f2,f3,f12,f14&fltt=2&secids=' + secids.join(',') + '&_=' + Date.now();
             
             // 发送API请求获取实时数据
             fetch(apiUrl)
@@ -1031,19 +1005,9 @@
                 })
                 .then(function(data) {
                     // 检查返回数据是否有效
-                    if (data && data.data) {
-                        // 更新缓存并合并数据
-                        Array.prototype.forEach.call(data.data, function(stock) {
-                            allData[stock.symbol] = stock;
-                            // 更新缓存
-                            dataCache.realTimeData[stock.symbol] = {
-                                data: stock,
-                                timestamp: Date.now()
-                            };
-                        });
-                        
-                        // 使用合并后的数据更新表格
-                        updateStockTable(allData, rows, codeMap);
+                    if (data && data.data && data.data.diff) {
+                        // 更新表格
+                        updateStockTable(data.data.diff, rows, codeMap);
                         retryCount = 0;
                     } else {
                         throw new Error('无效的返回数据');
@@ -1051,10 +1015,6 @@
                 })
                 .catch(function(error) {
                     console.error('获取实时股票数据失败:', error);
-                    // 如果API请求失败，尝试使用缓存数据
-                    if (Object.keys(allData).length > 0) {
-                        updateStockTable(allData, rows, codeMap);
-                    }
                     
                     retryCount++;
                     
@@ -1076,14 +1036,15 @@
         
         // 更新股票表格数据的辅助函数
         function updateStockTable(data, rows, codeMap) {
-            if (!data || Object.keys(data).length === 0) {
+            if (!data || data.length === 0) {
                 return;
             }
             
             // 遍历所有股票数据
-            Object.keys(data).forEach(function(symbol) {
-                var stock = data[symbol];
-                var code = stock.symbol.substring(2); // 获取6位股票代码
+            Array.prototype.forEach.call(data, function(stock) {
+                var code = stock.f12; // 获取6位股票代码
+                var price = stock.f2; // 价格
+                var changePercent = stock.f3; // 涨幅百分比
                 
                 // 查找所有包含该股票代码的行
                 Array.prototype.forEach.call(rows, function(row) {
@@ -1097,20 +1058,20 @@
                             var targetRow = codeMap[uniqueKey];
                             
                             if (targetRow) {
-                                // 确定颜色（红色上涨，绿色下跌，黑色不变）
-                                var color = stock.percent > 0 ? '#e33232' : (stock.percent < 0 ? '#00a854' : '');
+                                // 确定颜色（红色上涨，绿色下跌）
+                                var color = changePercent > 0 ? '#e33232' : '#00a854';
                                 
                                 // 更新价格
                                 var priceElement = targetRow.querySelector('.price');
                                 if (priceElement) {
-                                    priceElement.textContent = stock.current || '-';
+                                    priceElement.textContent = price || '-';
                                     priceElement.style.color = color;
                                 }
                                 
                                 // 更新涨跌幅
                                 var changeElement = targetRow.querySelector('.change-percentage');
                                 if (changeElement) {
-                                    changeElement.textContent = (stock.percent || 0).toFixed(2) + '%';
+                                    changeElement.textContent = (changePercent || 0).toFixed(2) + '%';
                                     changeElement.style.color = color;
                                 }
                             }
@@ -1419,8 +1380,77 @@
             }
         }
         
-        // 在DOM加载完成后设置题材统计监听器
+        // 题材搜索功能
+        function searchPlate() {
+            // 获取搜索框输入值
+            const searchInput = document.getElementById('plateSearchInput');
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            
+            if (!searchTerm) {
+                // 如果没有搜索条件，不执行搜索
+                return;
+            }
+            
+            // 调用后端API搜索所有日期的题材数据
+            fetch(`/filter-by-plate?plate=${encodeURIComponent(searchTerm)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('stockTableBody');
+                    tbody.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="10" class="no-data">没有找到匹配的题材数据</td></tr>';
+                        return;
+                    }
+                    
+                    // 渲染搜索结果到左侧表格
+                    Array.prototype.forEach.call(data, function(stock) {
+                        var row = document.createElement('tr');
+                        var link = 'https://xuangutong.com.cn/stock/' + stock.code_part + '.' + stock.market.toUpperCase();
+                        var codeClass = stock.code_part.startsWith('3') ? 'orange-code' : '';
+                        var nameClass = (stock.code_part.startsWith('3') || stock.code_part.startsWith('68')) ? 'stock-name-link orange-text' : 'stock-name-link';
+                        row.innerHTML = 
+                            '<td><a href="' + link + '" target="_blank" class="' + nameClass + '">' + stock.name + '</a></td>' +
+                            '<td><div class="time-chart" data-code="' + stock.code_part + '"></div></td>' +
+                            '<td class="price"></td>' +
+                            '<td class="change-percentage"></td>' +
+                            '<td class="' + codeClass + '">' + stock.code_part + '</td>' +
+                            '<td>' + stock.market + '</td>' +
+                            '<td>' + (stock.m_days_n_boards ? '<span class="days-boards-tag">' + stock.m_days_n_boards + '</span>' : stock.m_days_n_boards) + '</td>' +
+                            '<td>' + stock.description + '</td>' +
+                            '<td>' + stock.plates + '</td>' +
+                            '<td>' + stock.date + '</td>';
+                        tbody.appendChild(row);
+                    });
+                    
+                    // 重置分时图状态并重新渲染
+                    visibleStockCodes = {}; // 重置可见股票代码集合
+                    timeChartInstances = {}; // 重置图表实例
+                    setTimeout(function() {
+                        renderVisibleCharts(); // 重新渲染可见区域内的分时图
+                        fetchRealTimeStockData(); // 获取实时股票数据
+                        // 更新题材统计
+                        updatePlateStats();
+                    }, 100);
+                })
+                .catch(function(error) {
+                    console.error('搜索题材数据失败:', error);
+                    const tbody = document.getElementById('stockTableBody');
+                    tbody.innerHTML = '<tr><td colspan="10" class="no-data">搜索题材数据时发生错误</td></tr>';
+                });
+        }
+        
+        // 为搜索框添加回车键事件
         document.addEventListener('DOMContentLoaded', function() {
+            const plateSearchInput = document.getElementById('plateSearchInput');
+            if (plateSearchInput) {
+                plateSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        searchPlate();
+                    }
+                });
+            }
+            
             // 检查filterByDate函数，在其末尾添加更新统计的代码
             // 如果是通过API加载的数据，需要在数据加载完成后更新统计
             setupPlateStatsListener();

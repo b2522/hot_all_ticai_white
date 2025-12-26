@@ -243,18 +243,29 @@ def scheduled_crawl():
     crawler.crawl_stock_data(crawl_today_only=True, force_update=True)
     logging.info("定时任务执行完成: 股票数据抓取已完成")
 
-# 初始化定时任务调度器
-scheduler = BackgroundScheduler(timezone='Asia/Shanghai')
-# 添加定时任务：周一到周五15:10执行
-scheduler.add_job(scheduled_crawl, 'cron', hour=15, minute=10, second=0, day_of_week='0-4')
-# 添加定时任务：周一到周五16:15执行
-scheduler.add_job(scheduled_crawl, 'cron', hour=16, minute=15, second=0, day_of_week='0-4')
+@app.route('/api/crawl')
+def api_crawl_stock_data():
+    """API端点：抓取股票数据
+    用于Vercel Cron Jobs或其他外部服务调用
+    """
+    logging.info("API请求开始执行: 抓取股票数据")
+    result = crawler.crawl_stock_data(crawl_today_only=True, force_update=True, bypass_time_check=True)
+    logging.info("API请求执行完成: 股票数据抓取已完成")
+    return jsonify(result)
 
-
-# 直接启动调度器，不再使用before_first_request装饰器
+# 初始化定时任务调度器（仅在本地开发环境使用）
+# Vercel环境下使用Cron Jobs替代
 try:
-    scheduler.start()
-    logging.info("定时任务调度器已启动")
+    if os.environ.get('VERCEL_ENV') is None:  # 仅在本地环境启动
+        scheduler = BackgroundScheduler(timezone='Asia/Shanghai')
+        # 添加定时任务：周一到周五15:10执行
+        scheduler.add_job(scheduled_crawl, 'cron', hour=15, minute=10, second=0, day_of_week='0-4')
+        # 添加定时任务：周一到周五16:15执行
+        scheduler.add_job(scheduled_crawl, 'cron', hour=16, minute=15, second=0, day_of_week='0-4')
+        scheduler.start()
+        logging.info("定时任务调度器已启动（本地开发环境）")
+    else:
+        logging.info("Vercel环境下跳过定时任务调度器启动")
 except Exception as e:
     logging.error(f"启动定时任务调度器失败: {e}")
 

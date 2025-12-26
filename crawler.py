@@ -20,8 +20,6 @@ HEADERS = {
 
 # 开始日期：2025年12月1日
 START_DATE = datetime.datetime(2025, 12, 1)
-# 结束日期：今天
-END_DATE = datetime.datetime.now()
 
 def is_weekday(date):
     """判断日期是否为工作日（周一到周五）"""
@@ -72,6 +70,9 @@ def crawl_stock_data(crawl_today_only=True, force_update=False, bypass_time_chec
         "message": ""
     }
     
+    # 获取当前时间作为结束日期
+    end_date = datetime.datetime.now()
+    
     # 检查是否在允许的抓取时间范围内
     if not is_valid_crawl_time(bypass_time_check):
         logging.error("不在允许的抓取时间范围内（只能在15:00到9:00之间抓取）")
@@ -81,12 +82,10 @@ def crawl_stock_data(crawl_today_only=True, force_update=False, bypass_time_chec
     
     if crawl_today_only:
         # 只抓取今天的数据
-        current_date = END_DATE
-        end_date = END_DATE
+        current_date = end_date
     else:
         # 抓取从开始日期到今天的所有数据
         current_date = START_DATE
-        end_date = END_DATE
     
     while current_date <= end_date:
         # 判断是否为工作日

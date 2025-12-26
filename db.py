@@ -535,8 +535,9 @@ def search_stocks_by_plate(plate):
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'stock_%' ORDER BY name DESC")
         tables = cursor.fetchall()
         
-        # 搜索结果列表
-        search_results = []
+        # 使用字典去重，确保每个股票只保留最新日期的记录
+        # 键: 股票代码, 值: 股票数据
+        unique_stocks = {}
         
         # 遍历所有表，搜索符合条件的数据
         for table in tables:
@@ -553,10 +554,14 @@ def search_stocks_by_plate(plate):
             cursor.execute(search_sql, (f"%{plate}%",))
             rows = cursor.fetchall()
             
-            # 转换为字典格式并进行拼音首字母筛选
+            # 转换为字典格式并进行去重
             for row in rows:
                 code = row[0]
                 stock_plates = row[3]
+                
+                # 如果该股票已经在结果中（已有最新日期的记录），则跳过
+                if code in unique_stocks:
+                    continue
                 
                 # 分割股票代码和市场
                 code_part = code
@@ -564,7 +569,8 @@ def search_stocks_by_plate(plate):
                 if "." in code:
                     code_part, market = code.split(".")
                 
-                search_results.append({
+                # 添加到去重字典中
+                unique_stocks[code] = {
                     "code": code,
                     "code_part": code_part,
                     "market": market,
@@ -573,7 +579,10 @@ def search_stocks_by_plate(plate):
                     "plates": stock_plates,
                     "m_days_n_boards": row[4],
                     "date": row[5]
-                })
+                }
+        
+        # 将去重后的结果转换为列表
+        search_results = list(unique_stocks.values())
         
         # 应用新的排序规则：按照题材数量和同一题材股票数量排序
         sorted_results = sort_stocks_by_plates(search_results)
