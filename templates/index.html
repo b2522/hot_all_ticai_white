@@ -8,7 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <!-- 引入外部CSS文件 -->
     <link rel="stylesheet" href="/static/css/styles.css">
-</head>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.2/dist/echarts.min.js"></script>
+        <script src="../static/js/klinechart.js"></script>
+    </head>
 <body>
     <div class="container">
 
@@ -402,7 +404,7 @@
         // 根据股票代码获取分时数据的API调用函数，暂时禁用缓存以解决数据显示问题
         function fetchTimeSharingData(stockCode) {
             // 直接获取最新数据，不使用缓存
-            // 使用后端代理来避免CORS问题
+            // 使用后端代理API避免CORS问题
             var proxyUrl = '/api/time-sharing-data?code=' + encodeURIComponent(stockCode);
             
             // 返回Promise对象
@@ -993,7 +995,8 @@
             }
             
             // 构建API URL
-            var apiUrl = 'https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f2,f3,f12,f14&fltt=2&secids=' + secids.join(',') + '&_=' + Date.now();
+            // 使用后端代理API避免CORS问题
+            var apiUrl = '/api/proxy-eastmoney-stock-data?secids=' + secids.join(',');
             
             // 发送API请求获取实时数据
             fetch(apiUrl)
@@ -1025,6 +1028,7 @@
                         }, 3000); // 3秒后重试
                     } else {
                         // 达到最大重试次数
+                        // 不再重试，因为后端已经有降级处理机制
                         retryCount = 0;
                     }
                 })
@@ -1036,15 +1040,30 @@
         
         // 更新股票表格数据的辅助函数
         function updateStockTable(data, rows, codeMap) {
+            // 日志记录接收到的数据
+            console.log('接收到的股票数据:', data);
+            
             if (!data || data.length === 0) {
+                console.log('无数据可更新');
                 return;
             }
             
+            console.log(`正在更新 ${data.length} 条股票数据`);
+            
             // 遍历所有股票数据
             Array.prototype.forEach.call(data, function(stock) {
-                var code = stock.f12; // 获取6位股票代码
-                var price = stock.f2; // 价格
-                var changePercent = stock.f3; // 涨幅百分比
+                console.log('处理股票数据:', stock);
+                
+                // 获取股票代码（f12字段）
+                var code = stock.f12;
+                if (!code) {
+                    console.warn('股票数据缺少代码字段:', stock);
+                    return;
+                }
+                
+                // 获取价格和涨幅，提供默认值以防止显示错误
+                var price = stock.f2 !== undefined && stock.f2 !== null ? stock.f2 : 0;
+                var changePercent = stock.f3 !== undefined && stock.f3 !== null ? stock.f3 : 0;
                 
                 // 查找所有包含该股票代码的行
                 Array.prototype.forEach.call(rows, function(row) {
@@ -1058,21 +1077,49 @@
                             var targetRow = codeMap[uniqueKey];
                             
                             if (targetRow) {
-                                // 确定颜色（红色上涨，绿色下跌）
-                                var color = changePercent > 0 ? '#e33232' : '#00a854';
+                                // 确定颜色（红色上涨，绿色下跌，灰色平）
+                                var color = changePercent > 0 ? '#e33232' : (changePercent < 0 ? '#00a854' : '#666666');
                                 
-                                // 更新价格
+                                // 更新价格 - 确保价格格式正确
                                 var priceElement = targetRow.querySelector('.price');
                                 if (priceElement) {
-                                    priceElement.textContent = price || '-';
-                                    priceElement.style.color = color;
+                                    try {
+                                        // 尝试将价格转换为数字并格式化
+                                        var priceNum = parseFloat(price);
+                                        if (!isNaN(priceNum) && priceNum >= 0) {
+                                            priceElement.textContent = priceNum.toFixed(2);
+                                            priceElement.style.color = color;
+                                        } else {
+                                            console.warn(`股票 ${code} 价格数据异常:`, price);
+                                            priceElement.textContent = '--';
+                                            priceElement.style.color = '#666666';
+                                        }
+                                    } catch (e) {
+                                        console.error(`格式化价格出错:`, e);
+                                        priceElement.textContent = '--';
+                                        priceElement.style.color = '#666666';
+                                    }
                                 }
                                 
-                                // 更新涨跌幅
+                                // 更新涨跌幅 - 确保百分比格式正确
                                 var changeElement = targetRow.querySelector('.change-percentage');
                                 if (changeElement) {
-                                    changeElement.textContent = (changePercent || 0).toFixed(2) + '%';
-                                    changeElement.style.color = color;
+                                    try {
+                                        // 尝试将涨幅转换为数字并格式化
+                                        var changeNum = parseFloat(changePercent);
+                                        if (!isNaN(changeNum)) {
+                                            changeElement.textContent = changeNum.toFixed(2) + '%';
+                                            changeElement.style.color = color;
+                                        } else {
+                                            console.warn(`股票 ${code} 涨跌幅数据异常:`, changePercent);
+                                            changeElement.textContent = '--%';
+                                            changeElement.style.color = '#666666';
+                                        }
+                                    } catch (e) {
+                                        console.error(`格式化涨跌幅出错:`, e);
+                                        changeElement.textContent = '--%';
+                                        changeElement.style.color = '#666666';
+                                    }
                                 }
                             }
                         }
@@ -1081,10 +1128,11 @@
             });
         }
         
-        // 第六列【几天几板】降序排列功能
-        var isSortedDesc = false;
-        var isChangeSortedDesc = false;
-        
+        // 排序函数
+        function sortTable(columnIndex) {
+            // ... 现有排序逻辑不变 ...
+        }
+
         function sortByDaysBoards() {
             var tbody = document.getElementById('stockTableBody');
             var rows = Array.prototype.slice.call(tbody.getElementsByTagName('tr')).filter(function(row) {
@@ -1255,7 +1303,7 @@
                 });
         }
         
-        // 在DOM加载完成后，为搜索框添加防抖处理
+        // 为DOM加载完成后，为搜索框添加防抖处理
         document.addEventListener('DOMContentLoaded', function() {
             const plateFilter = document.getElementById('plateFilter');
             if (plateFilter) {
@@ -1459,7 +1507,96 @@
             setTimeout(function() {
                 updatePlateStats();
             }, 300); // 稍微延迟一下，确保DOM完全加载
+            
+            // 初始化K线图相关事件
+            if (typeof initStockNameEvents === 'function') {
+                initStockNameEvents();
+            }
         });
     </script>
 </body>
 </html>
+
+<!-- K线图弹出窗口 -->
+<div id="kLinePopup" class="k-line-popup">
+    <div class="popup-header">
+        <span id="popupStockName" class="popup-title">K线图</span>
+        <span class="popup-close" onclick="closeKLinePopup()">×</span>
+    </div>
+    <!-- 弹窗内容 -->
+    <div class="popup-content">
+        <!-- K线图容器 -->
+        <div id="kLineChart" style="width: 100%; height: 400px;"></div>
+        <!-- 成交量图容器 -->
+        <div id="volumeChart" style="width: 100%; height: 150px;"></div>
+        <!-- 关闭按钮 -->
+        <button class="close-button" onclick="closeKLinePopup()">关闭</button>
+    </div>
+</div>
+
+<!-- 弹窗样式 -->
+<style>
+.k-line-popup {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 600px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    display: none;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+}
+
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.popup-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.popup-close {
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.popup-close:hover {
+    color: #333;
+}
+
+.popup-content {
+    padding: 16px;
+}
+
+.chart-container {
+    width: 100%;
+    height: 250px;
+    margin-bottom: 10px;
+}
+
+#volumeChart {
+    height: 120px;
+}
+
+/* 添加指针样式，提示可悬停 */
+.stock-name-link {
+    cursor: pointer;
+}
+</style>
+
+
+
+
+
