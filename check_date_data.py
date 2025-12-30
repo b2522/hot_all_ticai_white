@@ -78,5 +78,5 @@ def check_date_data(date_str):
         if 'conn' in locals():
             conn.close()
 
-# 检查20251223的数据状态
-check_date_data('20251223')
+# 检查昨天(20251229)的数据状态
+check_date_data('20251229')

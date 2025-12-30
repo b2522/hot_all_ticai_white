@@ -74,35 +74,76 @@ def store_stock_data(date_str, stock_data):
         
         table_name = f"stock_{date_str}"
         
-        # 首先创建唯一索引来防止重复
-        try:
-            cursor.execute(f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{table_name}_code ON {table_name}(code)")
-        except Exception as e:
-            logging.warning(f"创建唯一索引失败: {e}")
-        
-        # 使用INSERT OR REPLACE来插入数据，如果有重复则替换
-        insert_sql = f'''
-        INSERT OR REPLACE INTO {table_name} (code, name, description, plates, m_days_n_boards, date)
-        VALUES (?, ?, ?, ?, ?, ?)
-        '''
-        
-        # 准备数据
-        data_to_insert = []
+        # 1. 先对新抓取的数据进行去重，按股票名称分组，保留plates内容较多的记录
+        name_to_stock = {}
         for stock in stock_data:
-            data_to_insert.append((
-                stock["code"],
-                stock["name"],
-                stock["description"],
-                stock["plates"],
-                stock["m_days_n_boards"],
-                stock["date"]
-            ))
+            name = stock["name"]
+            if name not in name_to_stock:
+                name_to_stock[name] = stock
+            else:
+                # 比较plates长度，保留内容较多的
+                current_plates_len = len(name_to_stock[name]["plates"])
+                new_plates_len = len(stock["plates"])
+                if new_plates_len > current_plates_len:
+                    name_to_stock[name] = stock
         
-        # 执行批量插入
-        cursor.executemany(insert_sql, data_to_insert)
+        # 2. 查询数据库中已有的数据，按股票名称分组
+        existing_data = {}
+        try:
+            cursor.execute(f"SELECT code, name, description, plates, m_days_n_boards, date FROM {table_name}")
+            rows = cursor.fetchall()
+            for row in rows:
+                name = row[1]
+                existing_stock = {
+                    "code": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "plates": row[3],
+                    "m_days_n_boards": row[4],
+                    "date": row[5]
+                }
+                existing_data[name] = existing_stock
+        except Exception as e:
+            logging.warning(f"查询已有数据失败: {e}")
+            existing_data = {}
+        
+        # 3. 准备需要插入和更新的数据
+        to_insert = []
+        to_update = []
+        
+        for name, new_stock in name_to_stock.items():
+            if name in existing_data:
+                # 比较plates长度，决定是否更新
+                existing_plates_len = len(existing_data[name]["plates"])
+                new_plates_len = len(new_stock["plates"])
+                if new_plates_len > existing_plates_len:
+                    to_update.append(new_stock)
+            else:
+                # 新记录，插入
+                to_insert.append(new_stock)
+        
+        # 4. 执行插入操作
+        if to_insert:
+            insert_sql = f'''
+            INSERT INTO {table_name} (code, name, description, plates, m_days_n_boards, date)
+            VALUES (?, ?, ?, ?, ?, ?)
+            '''
+            insert_values = [(s["code"], s["name"], s["description"], s["plates"], s["m_days_n_boards"], s["date"]) for s in to_insert]
+            cursor.executemany(insert_sql, insert_values)
+            logging.info(f"成功插入{len(to_insert)}条新数据到表{table_name}")
+        
+        # 5. 执行更新操作
+        if to_update:
+            update_sql = f'''
+            UPDATE {table_name} SET code=?, description=?, plates=?, m_days_n_boards=? WHERE name=?
+            '''
+            update_values = [(s["code"], s["description"], s["plates"], s["m_days_n_boards"], s["name"]) for s in to_update]
+            cursor.executemany(update_sql, update_values)
+            logging.info(f"成功更新{len(to_update)}条数据到表{table_name}")
+        
         conn.commit()
-        
-        logging.info(f"成功将{len(data_to_insert)}条数据插入表{table_name}（已去重）")
+        total_processed = len(to_insert) + len(to_update)
+        logging.info(f"总共处理了{total_processed}条数据（插入{len(to_insert)}条，更新{len(to_update)}条）")
         
     except Exception as e:
         logging.error(f"存储数据失败: {e}")
