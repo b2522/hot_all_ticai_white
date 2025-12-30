@@ -18,6 +18,8 @@
         
         <!-- 移除重复的搜索框 -->
         <div class="table-container">
+            <!-- 搜索建议下拉框 -->
+            <div id="searchSuggestions" class="search-suggestions"></div>
             <table>
                 <thead>
                     <tr>
@@ -28,6 +30,7 @@
                                     id="searchInput" 
                                     placeholder="股票名称" 
                                     class="search-input"
+                                    oninput="showSuggestions(this.value)"
                                 >
                             </div>
                         </th>
@@ -99,10 +102,73 @@
         </div>
     </div>
     
+    <style>
+        /* 搜索建议样式 */
+        .search-wrapper {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 30px;
+        }
+        
+        .search-input {
+            width: 100%;
+            height: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        
+        /* 将搜索建议下拉框放在表格外部 */
+        #searchSuggestions {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 120px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 3px 3px;
+            background-color: white;
+            z-index: 9999;
+            display: none;
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.2);
+            /* 确保下拉框不被其他元素裁剪 */
+            clip-path: none;
+            /* 确保下拉框能够覆盖在表格内容上方 */
+            transform: translateZ(0);
+            backface-visibility: hidden;
+        }
+        
+        .search-suggestion-item {
+            padding: 6px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .search-suggestion-item:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+    
     <script>
         // 搜索建议功能，从后端API获取数据
         function showSuggestions(inputValue) {
             var suggestionsContainer = document.getElementById('searchSuggestions');
+            var searchInput = document.getElementById('searchInput');
+            
+            // 动态定位搜索建议下拉框
+            var inputRect = searchInput.getBoundingClientRect();
+            var containerRect = document.querySelector('.table-container').getBoundingClientRect();
+            
+            suggestionsContainer.style.top = (inputRect.bottom - containerRect.top) + 'px';
+            suggestionsContainer.style.left = (inputRect.left - containerRect.left) + 'px';
+            suggestionsContainer.style.width = inputRect.width + 'px';
             
             if (inputValue === '') {
                 suggestionsContainer.style.display = 'none';
@@ -1128,6 +1194,10 @@
             });
         }
         
+        // 排序状态变量（全局）
+        var isSortedDesc = false; // 几天几板排序状态
+        var isChangeSortedDesc = false; // 涨跌幅排序状态
+
         // 排序函数
         function sortTable(columnIndex) {
             // ... 现有排序逻辑不变 ...

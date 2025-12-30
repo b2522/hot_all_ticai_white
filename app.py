@@ -115,8 +115,32 @@ def search_results():
         latest_data = db.get_latest_day_data()
         return render_template('index.html', stocks=latest_data, search_mode=False)
     
-    # 搜索所有日期的相关数据
+    # 首先使用基本的关键词搜索
     search_results = db.search_stocks_by_keyword(keyword)
+    
+    # 如果没有结果，再尝试拼音搜索作为补充
+    if not search_results:
+        all_stock_info = db.get_all_stock_names_and_codes()
+        matched_codes = set()
+        
+        for name, code in all_stock_info:
+            # 转换为拼音
+            pinyin = ''.join(lazy_pinyin(name))
+            # 转换为拼音首字母缩写
+            pinyin_abbr = ''.join(lazy_pinyin(name, style=FIRST_LETTER))
+            
+            # 检查是否匹配
+            if (keyword.lower() in pinyin.lower() or 
+                keyword.lower() in pinyin_abbr.lower()):
+                matched_codes.add(code)
+        
+        # 如果有匹配的代码，搜索这些代码的所有数据
+        if matched_codes:
+            search_results = []
+            for code in matched_codes:
+                # 搜索该代码的所有数据
+                code_results = db.search_stocks_by_keyword(code)
+                search_results.extend(code_results)
     return render_template('index.html', stocks=search_results, search_mode=True, search_keyword=keyword)
 
 @app.route('/get-data-by-date')
