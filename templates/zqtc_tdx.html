@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -547,8 +548,7 @@
             if (!codes || codes.length === 0) return {};
             
             const secIds = codes.map(code => getSecId(code)).join(',');
-            // 使用后端代理API解决CORS跨域问题
-            const API_URL = `/api/proxy-eastmoney-stock-data?secids=${secIds}`;
+            const API_URL = `https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f2,f3,f6,f12,f14&fltt=2&secids=${secIds}`;
             
             console.log('Fetching real-time data from:', API_URL);
             
@@ -557,6 +557,10 @@
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json, text/plain, */*',
+                        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Referer': 'https://quote.eastmoney.com/',
+                        'Connection': 'keep-alive'
                     }
                 });
                 const data = await response.json();
@@ -732,6 +736,12 @@
                 
                 const nameCell = row.insertCell(0);
                 nameCell.textContent = stock.name;
+                
+                if (cleanCode.startsWith('3')) {
+                    nameCell.style.color = '#ff9933';
+                } else if (cleanCode.startsWith('68')) {
+                    nameCell.style.color = '#4d90fe';
+                }
                 
                 const boardsCell = row.insertCell(1);
                 boardsCell.textContent = stock.boards || '-';
