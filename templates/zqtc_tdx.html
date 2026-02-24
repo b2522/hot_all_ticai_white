@@ -27,44 +27,41 @@
             padding: 5px;
             background-color: var(--bg-color);
             color: var(--text-color);
-            width: 900px;
+            width: 100%;
+            max-width: 100%;
             margin: 0 auto;
         }
         .container {
             width: 100%;
+            max-width: 100%;
             margin: 0 auto;
             background-color: var(--container-bg);
             padding: 8px;
             border-radius: 3px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.3);
             font-size: 12px;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
-        h1 {
-            text-align: center;
-            color: var(--header-color);
-            border-bottom: 1px solid #4CAF50;
-            padding-bottom: 3px;
-            font-size: 16px;
-            margin: 5px 0;
+        body {
+            font-family: "Microsoft YaHei", "微软雅黑", SimSun, "宋体", sans-serif;
+            margin: 0;
+            padding: 5px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            width: 900px;
+            margin: 0 auto;
         }
         .header-container {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            justify-content: flex-start;
+            align-items: flex-start;
             margin-bottom: 10px;
-        }
-        .date-title {
-            flex: 1;
-            text-align: left;
-            color: var(--header-color);
-            font-weight: bold;
-            font-size: 13px;
-        }
-        .concept-title {
-            flex: 1;
-            text-align: right;
-            color: red;
-            font-size: 13px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .content {
             display: flex;
@@ -168,7 +165,8 @@
             padding: 20px;
         }
         
-        .refresh-btn {
+        .refresh-btn,
+        .refresh-button {
             background-color: #4CAF50;
             color: white;
             border: none;
@@ -177,15 +175,19 @@
             font-size: 12px;
             border-radius: 3px;
         }
-        .refresh-btn:hover {
+        .refresh-btn:hover,
+        .refresh-button:hover {
             background-color: #45a049;
         }
         
         .date-selector {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 15px;
             margin-left: 10px;
+            flex-wrap: wrap;
+            width: 100%;
+            padding: 5px 0;
         }
         
         .date-selector input[type="date"] {
@@ -193,7 +195,7 @@
             color: #ccc;
             border: 1px solid #3f3f46;
             padding: 3px 5px;
-            font-size: 12px;
+            font-size: 14px;
             border-radius: 3px;
             cursor: pointer;
         }
@@ -206,7 +208,7 @@
             flex: 1;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 15px;
         }
         .date-selector input[type="date"] {
             padding: 3px 5px;
@@ -223,6 +225,20 @@
         .date-selector input[type="date"]::-webkit-calendar-picker-indicator {
             filter: invert(1);
             cursor: pointer;
+        }
+        .filter-input {
+            margin: 0 auto;
+            display: block;
+            padding: 5px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            text-align: center;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            width: 100%;
+            max-width: 150px;
+            box-sizing: border-box;
+            font-size: 14px;
         }
         .font-size-control {
             display: flex;
@@ -274,22 +290,25 @@
 </head>
 <body>
     <div class="container">
-        <h1>最强题材解读</h1>
-        
         <div class="header-container">
             <div class="date-selector">
-                <input type="date" id="datePicker" placeholder="年/月/日" onchange="onDateChange()">
+                <span class="market-label" style="font-size: 14px;">
+                    <span style="color: orange;">橙色字体【创业板】</span> <span style="color: rgba(60, 127, 250, 0.781);">蓝色字体【科创板】</span>
+                </span>
+                <span style="color: var(--text-color); font-size: 14px;"> | </span>
+                <button onclick="location.reload()" class="refresh-button" title="刷新页面">
+                    刷新
+                </button>
+                <span style="color: var(--text-color); font-size: 14px;"> | </span>
+                <input type="date" id="datePicker" placeholder="选择日期" onchange="onDateChange()" class="filter-input">
+                <span style="color: var(--text-color); font-size: 14px;"> | </span>
+                <a href="/" style="color: white !important; text-decoration: none !important; font-size: 14px;">所有股票同列</a>
+                <span style="color: var(--text-color); font-size: 14px;"> | </span>
+                <a href="/zqtc_tdx" style="color: white !important; text-decoration: none !important; font-size: 14px;">按题材同列</a>
+                <div style="margin-left: auto; color: orange !important; font-size: 14px;">
+                    公众号：别浪 好好学习
+                </div>
             </div>
-            <div style="font-size: 14px; color: #cccccc; margin-left: 10px;">
-               <span style="color: orange;">橙色字体【创业板】</span> <span style="color: rgba(60, 127, 250, 0.781);">蓝色字体【科创板】</span>                
-            </div>
-            <div class="font-size-control">
-                <button class="font-size-btn" onclick="changeFontSize(-1)">--</button>
-                <button class="font-size-btn" onclick="changeFontSize(0)">A</button>
-                <button class="font-size-btn" onclick="changeFontSize(1)">++</button>
-                <span class="font-size-display" id="fontSizeDisplay">14px</span>
-            </div>
-            <div class="concept-title" id="detailTitle">请选择题材</div>
         </div>
         
         <div class="content">
@@ -332,9 +351,7 @@
             </div>
         </div>
         
-        <div class="footer">
-            【公众号：别浪 好好学习】 生成时间: <span id="generateTime"></span>
-        </div>
+        
     </div>
     
     <script>
@@ -503,7 +520,14 @@
         }
         
         function formatChangeFromAPI(rate) {
-            return rate.toFixed(2) + '%';
+            // API返回的涨幅可能是小数形式(0.0999)或百分比形式(9.99)
+            // 如果rate大于10，说明已经是百分比形式，直接格式化
+            // 否则需要乘以100转换为百分比
+            if (Math.abs(rate) >= 10) {
+                return rate.toFixed(2) + '%';
+            } else {
+                return (rate * 100).toFixed(2) + '%';
+            }
         }
         
         function formatTurnover(rate) {
@@ -610,8 +634,8 @@
             const conceptBody = document.getElementById('conceptBody');
             const detailBody = document.getElementById('detailBody');
             
-            conceptBody.innerHTML = '<tr><td colspan="3" class="loading">加载中...</td></tr>';
-            detailBody.innerHTML = '<tr><td colspan="7" class="loading">请选择题材查看详情</td></tr>';
+            conceptBody.innerHTML = '<tr><td colspan="2" class="loading">加载中...</td></tr>';
+            detailBody.innerHTML = '<tr><td colspan="8" class="loading">请选择题材查看详情</td></tr>';
             
             try {
                 const response = await fetch(API_URL);
@@ -621,8 +645,7 @@
                     allStocks = data.data.items;
                     
                     if (allStocks.length === 0) {
-                        conceptBody.innerHTML = '<tr><td colspan="3" class="error">该日期无数据</td></tr>';
-                        document.getElementById('generateTime').textContent = formatDateTime(Math.floor(Date.now() / 1000));
+                        conceptBody.innerHTML = '<tr><td colspan="2" class="error">该日期无数据</td></tr>';
                         return;
                     }
                     
@@ -671,15 +694,12 @@
                     
                     if (sortedConcepts.length === 0) {
                         conceptBody.innerHTML = '<tr><td colspan="2" class="error">该日期无题材数据</td></tr>';
-                        document.getElementById('generateTime').textContent = formatDateTime(Math.floor(Date.now() / 1000));
                         return;
                     }
                     
                     renderConceptTable(sortedConcepts);
-                    
-                    document.getElementById('generateTime').textContent = formatDateTime(Math.floor(Date.now() / 1000));
                 } else {
-                    conceptBody.innerHTML = '<tr><td colspan="3" class="error">数据加载失败</td></tr>';
+                    conceptBody.innerHTML = '<tr><td colspan="2" class="error">数据加载失败</td></tr>';
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -702,18 +722,17 @@
                 countCell.textContent = stocks.length;
                 
                 row.addEventListener('click', function() {
-                    if (selectedRow) {
-                        selectedRow.classList.remove('selected-row');
-                    }
-                    this.classList.add('selected-row');
-                    selectedRow = this;
-                    
-                    document.getElementById('detailTitle').textContent = conceptName + ' 相关股票';
-                    currentSortField = null;
-                    sortDirection = 'desc';
-                    updateSortIndicators();
-                    renderDetailTable(stocks);
-                });
+                        if (selectedRow) {
+                            selectedRow.classList.remove('selected-row');
+                        }
+                        this.classList.add('selected-row');
+                        selectedRow = this;
+                        
+                        currentSortField = null;
+                        sortDirection = 'desc';
+                        updateSortIndicators();
+                        renderDetailTable(stocks);
+                    });
             });
         }
         
@@ -843,12 +862,7 @@
                     
                     console.log(`Updated with real-time data: price=${rtData.price}, change=${rtData.change}`);
                 } else {
-                    const currentPrice = parseFloat(priceCell.textContent);
-                    const currentChange = parseFloat(changeCell.textContent);
-                    priceCell.textContent = currentPrice.toFixed(2);
-                    changeCell.textContent = formatChange(currentChange);
-                    changeCell.style.color = currentChange > 0 ? '#ff4d4d' : '#4CAF50';
-                    
+                    // 没有实时数据时，保持原有显示不变
                     console.log(`No real-time data, keeping existing values`);
                 }
                 
@@ -873,10 +887,16 @@
         function sortByBoards() {
             if (currentStocks.length === 0) return;
             
+            if (currentSortField === 'boards') {
+                sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                sortDirection = 'desc';
+            }
+            
             const sortedStocks = [...currentStocks].sort((a, b) => {
                 const boardsA = parseBoards(a.boards);
                 const boardsB = parseBoards(b.boards);
-                return boardsB - boardsA;
+                return sortDirection === 'desc' ? boardsB - boardsA : boardsA - boardsB;
             });
             
             currentSortField = 'boards';
@@ -956,7 +976,7 @@
             amountIndicator.textContent = '';
             
             if (currentSortField === 'boards') {
-                boardsIndicator.textContent = '▼';
+                boardsIndicator.textContent = sortDirection === 'desc' ? '▼' : '▲';
             } else if (currentSortField === 'change') {
                 changeIndicator.textContent = sortDirection === 'desc' ? '▼' : '▲';
             } else if (currentSortField === 'amount') {
@@ -984,12 +1004,40 @@
                 autoRefreshTimer = null;
             }
         }
-        
+
         window.onload = function() {
             initDatePicker();
             fetchData();
             startAutoRefresh();
         };
+        
+        // 返回顶部按钮功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const backToTopBtn = document.getElementById('backToTopBtn');
+            
+            // 监听页面滚动事件
+            window.addEventListener('scroll', function() {
+                // 当滚动超过200像素时显示按钮，否则隐藏
+                if (window.pageYOffset > 200) {
+                    backToTopBtn.classList.add('show');
+                } else {
+                    backToTopBtn.classList.remove('show');
+                }
+            });
+            
+            // 点击按钮时平滑滚动到顶部
+            backToTopBtn.addEventListener('click', function() {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        });
     </script>
+    
+    <!-- 返回顶部按钮 -->
+    <button id="backToTopBtn" class="back-to-top" title="返回顶部">
+    </button>
+    
 </body>
 </html>
